@@ -6,13 +6,33 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Count, F, Q
 from django.views.decorators.http import require_POST
 from datetime import date, timedelta
-from django.core.mail import send_mail
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from .models import Donation, Site
 from .forms import DonationForm
 from .site_select_form import SiteSelectForm
+from .email_service import send_email
+
+
+def _format_gift_description(donation) -> str:
+    """Build a human-readable summary of what was donated."""
+    parts = []
+    if donation.cash_check:
+        parts.append(f"${donation.cash_check:,.2f} cash/check")
+    if donation.gift_cards:
+        parts.append(f"${donation.gift_cards:,.2f} in gift cards")
+    if donation.num_bags:
+        n = donation.num_bags
+        parts.append(f"{n} bag{'s' if n != 1 else ''}")
+    if donation.num_boxes:
+        n = donation.num_boxes
+        parts.append(f"{n} box{'es' if n != 1 else ''}")
+    if donation.total_weight:
+        parts.append(f"{donation.total_weight:,.2f} lbs")
+    if donation.other_donation:
+        parts.append(donation.other_donation)
+    return ", ".join(parts) if parts else "your donation"
 
 @login_required
 def donation_detail(request, pk):
@@ -193,7 +213,6 @@ def donation_export_pdf(request):
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
 from django.db.models import Count, F, Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -240,20 +259,46 @@ def donation_create(request):
             donation.save()
             success = True
             if donation.email:
-                send_mail(
-                    subject="Donation Verification",
-                    message=(
-                        "Thank you for your donation to Center for Food Action.\n\n"
-                        f"Donor: {donation.donor_name}\n"
-                        f"Site: {donation.site.name}\n"
-                        f"Date: {donation.donation_date}\n"
-                        f"Phone: {donation.phone_number or '-'}\n"
-                        f"Notes: {donation.notes}\n"
-                    ),
-                    from_email=None,
-                    recipient_list=[donation.email],
-                    fail_silently=True,
-                )
+                gift = _format_gift_description(donation)
+                name = donation.donor_name or "Friend"
+                received_on = donation.donation_date.strftime("%B %d, %Y")
+                html_body = f"""
+<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;
+            margin:0 auto;color:#222;line-height:1.75;font-size:15px;">
+  <p>Hello {name},</p>
+
+  <p>Thank you for your generous gift of <strong>{gift}</strong>, received on
+  <strong>{received_on}</strong>, in support of the Center for Food Action.
+  Your kindness helps power our mission to ensure that individuals and families
+  facing food insecurity in Bergen and Passaic counties have access to
+  nutritious food and essential resources.</p>
+
+  <p>Your generosity makes this work possible. We are deeply grateful for your
+  belief in our mission and your partnership in creating a stronger, more caring
+  community. Thank you for making a meaningful difference.</p>
+
+  <p>The Center for Food Action in NJ is a 501&nbsp;(c)&nbsp;(3) non-profit
+  corporation. No goods or services in part or in whole have been provided for
+  this charitable contribution.</p>
+
+  <br>
+  <p>Sincerely,</p>
+  <p>
+    Nicole A. Davis<br>
+    <em>Executive Director</em>
+  </p>
+</div>
+"""
+                try:
+                    send_email(
+                        recipient_email=donation.email,
+                        recipient_name=donation.donor_name,
+                        subject="Thank You for Your Donation to Center for Food Action",
+                        html_content=html_body,
+                        donation=donation,
+                    )
+                except Exception:
+                    pass  # email failure should not block the donation save
             form = DonationForm(initial={"donation_date": date.today()})
     else:
         form = DonationForm(initial={"donation_date": date.today()})
@@ -297,6 +342,7 @@ def donation_log(request):
 
     donor_type_choices = [
         ("", "All Categories"),
+        ("Anonymous", "Anonymous"),
         ("Civic", "Civic"),
         ("Religious", "Religious"),
         ("Corporate", "Corporate"),
@@ -333,3 +379,67 @@ def donor_suggestions(request):
         .order_by("-total", "donor_name")[:10]
     )
     return JsonResponse({"results": list(donors)})
+
+
+@login_required
+def donor_autocomplete(request):
+    q     = request.GET.get("q", "").strip()
+    field = request.GET.get("field", "name")
+
+    if len(q) < 2:
+        return JsonResponse([], safe=False)
+
+    filter_map = {
+        "email": Q(email__icontains=q),
+        "phone": Q(phone_number__icontains=q),
+        "name":  Q(donor_name__icontains=q),
+    }
+    filter_q = filter_map.get(field, filter_map["name"])
+
+    rows = (
+        Donation.objects
+        .filter(filter_q)
+        .order_by("-donation_date", "-created_at")
+        .values("donor_name", "email", "phone_number", "address", "organization")
+    )
+
+    seen    = set()
+    results = []
+    for row in rows:
+        key = (row["donor_name"].strip().lower(), row["email"].strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({
+            "name":         row["donor_name"],
+            "email":        row["email"],
+            "phone":        row["phone_number"],
+            "address":      row["address"],
+            "organization": row["organization"],
+        })
+        if len(results) >= 8:
+            break
+
+    return JsonResponse(results, safe=False)
+
+
+# ---------------------------------------------------------------------------
+# Unsubscribe flow (no login required – accessed from email link)
+# ---------------------------------------------------------------------------
+
+def unsubscribe(request, token):
+    """
+    GET  /unsubscribe/<token>/  – show confirmation page
+    POST /unsubscribe/<token>/  – process unsubscribe and show success
+    """
+    try:
+        donation = Donation.objects.get(unsubscribe_token=token)
+    except Donation.DoesNotExist:
+        return render(request, "donations/unsubscribe_invalid.html", status=404)
+
+    if request.method == "POST":
+        donation.unsubscribe = True
+        donation.save(update_fields=["unsubscribe"])
+        return render(request, "donations/unsubscribe_success.html", {"donation": donation})
+
+    return render(request, "donations/unsubscribe_confirm.html", {"donation": donation})

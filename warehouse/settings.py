@@ -10,7 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+# Load .env file if present (development convenience)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -117,8 +125,17 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "donations@cfa.local"
+# ---------------------------------------------------------------------------
+# Brevo (Sendinblue) transactional email
+# ---------------------------------------------------------------------------
+# BREVO_API_KEY                  – required in production
+# LIVE_EMAIL                     – set to "true" to send to real recipients;
+#                                  anything else redirects to the override address
+# LIVE_EMAIL_RECIPIENT_OVERRIDE  – redirect target in non-live mode
+#                                  (default: tnosrati@ramapo.edu)
+# SITE_BASE_URL                  – used to build unsubscribe links in emails
+#                                  (default: http://localhost:8000)
+# These are read at call-time by email_service.py; no Django email backend needed.
 
 LOGIN_REDIRECT_URL = "donation-create"
 LOGOUT_REDIRECT_URL = "login"

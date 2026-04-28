@@ -3,80 +3,371 @@
 {% block title %}Donation Log{% endblock %}
 
 {% block content %}
+<style>
+/* ── Enhanced stat cards ──────────────────────────────── */
+.stats .stat {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border-left: 4px solid var(--primary);
+}
+.stats .stat b {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 2px;
+  letter-spacing: -0.01em;
+}
+.stats .stat span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Filter panel ─────────────────────────────────────── */
+/* Row 1: five filter fields side-by-side */
+.lff-fields {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;   /* only wraps below ~600px */
+}
+.lff-field {
+  flex: 1 1 130px;   /* all fields grow equally; date fields can be a touch narrower */
+  min-width: 0;
+}
+.lff-field-date {
+  flex: 0 1 148px;   /* date pickers don't need to grow as much */
+}
+.lff-field label {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  white-space: nowrap;
+}
+/* Uniform height & styling for every input/select in the filter row */
+.lff-field input.form-control,
+.lff-field select.form-control {
+  height: 40px;
+  padding: 0 11px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.91rem;
+  background: #fff;
+  box-shadow: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.lff-field input.form-control:focus,
+.lff-field select.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(97,117,37,0.12);
+}
+
+/* Row 2: action buttons right-aligned */
+.lff-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* Shared button base — no inheritance from .btn or .btn-secondary */
+.lff-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1.5px solid transparent;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.lff-btn-filled {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.lff-btn-filled:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+.lff-btn-outline {
+  background: #fff;
+  color: var(--text);
+  border-color: var(--line);
+}
+.lff-btn-outline:hover { background: var(--bg); }
+.lff-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+/* ── Site totals row ──────────────────────────────────── */
+.site-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.site-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0f4ec;
+  border: 1px solid #d4e0c4;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.85rem;
+}
+.site-chip-name { color: var(--muted); font-weight: 500; }
+.site-chip-count { font-weight: 700; color: var(--primary); font-size: 0.95rem; }
+.site-chips-empty { color: var(--muted); font-size: 0.88rem; }
+
+/* ── Log table ────────────────────────────────────────── */
+.log-tbl thead th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #f5f7f9;
+  padding: 10px 10px;
+  border-bottom: 2px solid var(--line);
+  white-space: nowrap;
+}
+.log-tbl tbody td {
+  padding: 10px 10px;
+  font-size: 0.88rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef1f4;
+}
+.log-tbl tbody tr { cursor: pointer; transition: background 0.12s; }
+.log-tbl tbody tr:hover td { background: #f5f8f0; }
+.log-tbl tbody tr:last-child td { border-bottom: none; }
+
+/* Date column — nicely formatted */
+.log-tbl .col-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Type badge */
+.type-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.type-badge.type-anonymous { background: #f0f2f4; color: #637381; }
+.type-badge.type-individual { background: #e7f3fd; color: #1a6fa8; }
+.type-badge.type-civic      { background: #e8f5e9; color: #2e7d32; }
+.type-badge.type-religious  { background: #f3e8fd; color: #6a0dad; }
+.type-badge.type-corporate  { background: #fff3e0; color: #c45200; }
+
+/* Truncate long cells */
+.cell-trunc {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.cell-muted { color: var(--muted); }
+
+/* ── Preview modal ────────────────────────────────────── */
+#preview-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 30, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#preview-modal.open { display: flex; }
+#preview-modal-content {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(10,20,30,0.22);
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalIn 0.22s ease;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Styles for preview modal content (det-* classes injected via AJAX) */
+.det-section { padding: 1.25rem 1.5rem 0.5rem; }
+.det-section + .det-section { border-top: 1px solid var(--line); margin-top: 0.5rem; padding-top: 1.25rem; }
+.det-section-title {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 0.875rem;
+}
+.det-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.25rem; }
+.det-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 1rem; }
+.det-field { margin-bottom: 1rem; }
+.det-span-2 { grid-column: span 2; }
+.det-span-3 { grid-column: span 3; }
+.det-field label {
+  display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted);
+  letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 5px;
+}
+.det-field input.form-control,
+.det-field select.form-control,
+.det-field textarea.form-control {
+  width: 100%; padding: 9px 12px; border: 1.5px solid var(--line);
+  border-radius: 8px; font-size: 0.92rem; color: var(--text);
+  background: #fff; box-shadow: none;
+  transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;
+}
+.det-field input.form-control:focus,
+.det-field select.form-control:focus,
+.det-field textarea.form-control:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(97,117,37,0.14);
+}
+.det-field input[readonly].form-control { background: #f7f9fb; color: var(--muted); cursor: default; }
+.det-field select.form-control {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23637381' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 36px; cursor: pointer;
+}
+.det-field textarea.form-control { resize: vertical; min-height: 75px; }
+.det-error {
+  margin: 0 1.5rem 0.75rem;
+  background: #fdf2f2; border: 1px solid #f5c6c6;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 0.84rem; color: var(--danger);
+}
+.det-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid var(--line); margin-top: 0.5rem; gap: 10px;
+}
+.det-actions-right { display: flex; gap: 10px; align-items: center; }
+.det-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 38px; padding: 0 16px; border-radius: 8px;
+  font-size: 0.87rem; font-weight: 600; cursor: pointer;
+  text-decoration: none; border: 1.5px solid transparent;
+  transition: background 0.18s; white-space: nowrap; line-height: 1;
+}
+.det-btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.det-btn-primary:hover { background: var(--primary-strong); }
+.det-btn-secondary { background: #fff; color: var(--text); border-color: var(--line); }
+.det-btn-secondary:hover { background: var(--bg); }
+.det-btn-danger { background: #fff; color: var(--danger); border-color: #f5c6c6; }
+.det-btn-danger:hover { background: #fdf2f2; }
+</style>
+
+<!-- Stats -->
 <div class="stats">
-    <div class="stat">Filtered Results <b>{{ total_count }}</b></div>
-    <div class="stat">All Donations <b>{{ all_time_count }}</b></div>
-    <div class="stat">Last 30 Days <b>{{ last_30_days_total }}</b></div>
+    <div class="stat">
+        <span>Filtered Results</span>
+        <b>{{ total_count }}</b>
+    </div>
+    <div class="stat">
+        <span>All Donations</span>
+        <b>{{ all_time_count }}</b>
+    </div>
+    <div class="stat">
+        <span>Last 30 Days</span>
+        <b>{{ last_30_days_total }}</b>
+    </div>
 </div>
 
+<!-- Filter -->
 <div class="panel" style="margin-bottom: 14px;">
-    <form method="get" class="grid" style="align-items: end;">
-        <div class="form-row">
-            <label for="q">Search</label>
-            <input class="form-control" id="q" type="text" name="q" value="{{ query }}" placeholder="name, email, phone, site, notes">
+    <form method="get">
+        <!-- Row 1: all five filter fields -->
+        <div class="lff-fields">
+            <div class="lff-field">
+                <label for="q">Search</label>
+                <input class="form-control" id="q" type="text" name="q" value="{{ query }}"
+                       placeholder="name, email, phone, site, notes">
+            </div>
+            <div class="lff-field">
+                <label for="site">Site</label>
+                <select class="form-control" id="site" name="site">
+                    <option value="">All sites</option>
+                    {% for site_item in active_sites %}
+                    <option value="{{ site_item.name }}" {% if site_item.name == site %}selected{% endif %}>{{ site_item.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="lff-field">
+                <label for="donor_type">Donor Type</label>
+                <select class="form-control" id="donor_type" name="donor_type">
+                    {% for value, label in donor_type_choices %}
+                    <option value="{{ value }}" {% if value == donor_type %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="lff-field lff-field-date">
+                <label for="date_from">From</label>
+                <input class="form-control" id="date_from" type="date" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="lff-field lff-field-date">
+                <label for="date_to">To</label>
+                <input class="form-control" id="date_to" type="date" name="date_to" value="{{ date_to }}">
+            </div>
         </div>
-        <div class="form-row">
-            <label for="site">Site Filter</label>
-            <select class="form-control" id="site" name="site">
-                <option value="">All sites</option>
-                {% for site_item in active_sites %}
-                <option value="{{ site_item.name }}" {% if site_item.name == site %}selected{% endif %}>{{ site_item.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-row">
-            <label for="donor_type">Donor Category</label>
-            <select class="form-control" id="donor_type" name="donor_type">
-                {% for value, label in donor_type_choices %}
-                <option value="{{ value }}" {% if value == donor_type %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-row">
-            <label for="date_from">From Date</label>
-            <input class="form-control" id="date_from" type="date" name="date_from" value="{{ date_from }}">
-        </div>
-        <div class="form-row">
-            <label for="date_to">To Date</label>
-            <input class="form-control" id="date_to" type="date" name="date_to" value="{{ date_to }}">
-        </div>
-        <div class="form-row">
-            <button class="btn" type="submit">Apply Filter</button>
-            <a class="btn" href="{% url 'donation-log' %}">Reset</a>
-        </div>
-        <div class="form-row">
-            <a class="btn" href="{% url 'donation-export-csv' %}?q={{ query }}&site={{ site }}&donor_type={{ donor_type }}&date_from={{ date_from }}&date_to={{ date_to }}" target="_blank">Export CSV</a>
-            <a class="btn" href="{% url 'donation-export-pdf' %}?q={{ query }}&site={{ site }}&donor_type={{ donor_type }}&date_from={{ date_from }}&date_to={{ date_to }}" target="_blank">Export PDF</a>
+
+        <!-- Row 2: action buttons -->
+        <div class="lff-actions">
+            <button class="lff-btn lff-btn-filled" type="submit">Apply Filter</button>
+            <a class="lff-btn lff-btn-outline" href="{% url 'donation-log' %}">Reset</a>
+            <div class="lff-divider"></div>
+            <a class="lff-btn lff-btn-outline" href="{% url 'donation-export-csv' %}?q={{ query }}&site={{ site }}&donor_type={{ donor_type }}&date_from={{ date_from }}&date_to={{ date_to }}" target="_blank">Export CSV</a>
+            <a class="lff-btn lff-btn-outline" href="{% url 'donation-export-pdf' %}?q={{ query }}&site={{ site }}&donor_type={{ donor_type }}&date_from={{ date_from }}&date_to={{ date_to }}" target="_blank">Export PDF</a>
         </div>
     </form>
 </div>
 
+<!-- Site totals -->
 <div class="panel" style="margin-bottom: 14px;">
-    <h3 style="margin-top: 0;">Donations by Site</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Site</th>
-                <th>Total Donations</th>
-            </tr>
-        </thead>
-        <tbody>
+    <h3 style="margin-top: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px;">Donations by Site</h3>
+    <div class="site-chips">
         {% for row in site_totals %}
-            <tr>
-                <td>{{ row.site_name }}</td>
-                <td>{{ row.total }}</td>
-            </tr>
+        <div class="site-chip">
+            <span class="site-chip-name">{{ row.site_name }}</span>
+            <span class="site-chip-count">{{ row.total }}</span>
+        </div>
         {% empty %}
-            <tr><td colspan="2" class="muted">No site data yet.</td></tr>
+        <span class="site-chips-empty">No site data yet.</span>
         {% endfor %}
-        </tbody>
-    </table>
+    </div>
 </div>
 
+<!-- Donation log table -->
 <div class="panel">
-    <h3 style="margin-top: 0;">Donation Log</h3>
+    <h3 style="margin-top: 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px;">Donation Log</h3>
     <div class="table-responsive">
-    <table>
+    <table class="log-tbl">
         <thead>
             <tr>
                 <th>Date</th>
@@ -87,57 +378,65 @@
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Address</th>
-                <th># of Bags</th>
-                <th># of Boxes</th>
-                <th>Cash/Check $</th>
-                <th>Gift Cards $</th>
-                <th>Other Donation</th>
-                <th>Total Weight (lbs)</th>
+                <th>Bags</th>
+                <th>Boxes</th>
+                <th>Cash/Check</th>
+                <th>Gift Cards</th>
+                <th>Other</th>
+                <th>Weight (lbs)</th>
                 <th>Notes</th>
             </tr>
         </thead>
         <tbody>
         {% for donation in donations %}
-            <tr style="cursor:pointer;" onclick="window.location.href='{% url 'donation-detail' donation.id %}'">
-                <td>{{ donation.donation_date }}</td>
+            <tr onclick="window.location.href='{% url 'donation-detail' donation.id %}'">
+                <td class="col-date">{{ donation.donation_date|date:"M j, Y" }}</td>
                 <td>{{ donation.site.name }}</td>
-                <td>{{ donation.donor_name }}</td>
-                <td>{{ donation.donor_type }}</td>
-                <td>{{ donation.organization|default:"-" }}</td>
-                <td>{{ donation.email|default:"-" }}</td>
-                <td>{{ donation.phone_number|default:"-" }}</td>
-                <td>{{ donation.address|default:"-" }}</td>
-                <td>{{ donation.num_bags|default:"-" }}</td>
-                <td>{{ donation.num_boxes|default:"-" }}</td>
-                <td>{{ donation.cash_check|default:"-" }}</td>
-                <td>{{ donation.gift_cards|default:"-" }}</td>
-                <td>{{ donation.other_donation|default:"-" }}</td>
-                <td>{{ donation.total_weight|default:"-" }}</td>
-                <td>{{ donation.notes }}</td>
+                <td>{{ donation.donor_name|default:"—" }}</td>
+                <td>
+                    <span class="type-badge type-{{ donation.donor_type|lower }}">{{ donation.donor_type }}</span>
+                </td>
+                <td>{{ donation.organization|default:"—" }}</td>
+                <td><span class="cell-trunc">{{ donation.email|default:"—" }}</span></td>
+                <td style="white-space:nowrap;">{{ donation.phone_number|default:"—" }}</td>
+                <td><span class="cell-trunc">{{ donation.address|default:"—" }}</span></td>
+                <td>{{ donation.num_bags|default:"—" }}</td>
+                <td>{{ donation.num_boxes|default:"—" }}</td>
+                <td>{{ donation.cash_check|default:"—" }}</td>
+                <td>{{ donation.gift_cards|default:"—" }}</td>
+                <td>{{ donation.other_donation|default:"—" }}</td>
+                <td>{{ donation.total_weight|default:"—" }}</td>
+                <td><span class="cell-trunc cell-muted">{{ donation.notes|default:"" }}</span></td>
             </tr>
         {% empty %}
-            <tr><td colspan="17" class="muted">No donations found.</td></tr>
+            <tr><td colspan="15" style="text-align:center; padding:2rem; color:var(--muted);">No donations found.</td></tr>
         {% endfor %}
         </tbody>
     </table>
     </div>
 </div>
-{% endblock %}
-{% block extra_js %}
-<div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.35); z-index:1000; align-items:center; justify-content:center;">
-    <div id="preview-modal-content" style="background:#fff; border-radius:10px; max-width:600px; margin:40px auto; box-shadow:0 8px 22px rgba(20,40,60,0.18); position:relative; width:98vw; max-width:600px; min-width:280px; padding: 18px 12px;"></div>
+
+<!-- Preview modal (overlay rendered here, content injected via AJAX) -->
+<div id="preview-modal">
+    <div id="preview-modal-content"></div>
 </div>
+
 <script>
 function openPreviewModal(id) {
     fetch(`/donations/${id}/preview/`)
         .then(r => r.text())
         .then(html => {
             document.getElementById('preview-modal-content').innerHTML = html;
-            document.getElementById('preview-modal').style.display = 'flex';
+            document.getElementById('preview-modal').classList.add('open');
         });
 }
 function closePreviewModal() {
-    document.getElementById('preview-modal').style.display = 'none';
+    document.getElementById('preview-modal').classList.remove('open');
 }
+// Close on backdrop click
+document.getElementById('preview-modal').addEventListener('click', function(e) {
+    if (e.target === this) closePreviewModal();
+});
 </script>
+
 {% endblock %}

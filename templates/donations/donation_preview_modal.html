@@ -1,93 +1,106 @@
-<div id="donation-preview-content">
-    <h3 style="margin-top:0;">Donation Preview</h3>
-    <form id="donation-edit-form">
-        {% csrf_token %}
-        <table style="width:100%; border-collapse:collapse;">
-            <tr>
-                <th style="text-align:left; padding:4px 8px; width:38%;">Date</th>
-                <td style="padding:4px 8px;"><input type="date" name="donation_date" value="{{ donation.donation_date|date:'Y-m-d' }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Site</th>
-                <td style="padding:4px 8px;"><input type="text" value="{{ donation.site.name }}" class="form-control" readonly style="background:#f5f5f5;" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Donor</th>
-                <td style="padding:4px 8px;"><input type="text" name="donor_name" value="{{ donation.donor_name }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Type</th>
-                <td style="padding:4px 8px;">
-                    <select name="donor_type" class="form-control">
-                        {% for value, label in donor_type_choices %}
-                        <option value="{{ value }}" {% if donation.donor_type == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Organization</th>
-                <td style="padding:4px 8px;"><input type="text" name="organization" value="{{ donation.organization }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Email</th>
-                <td style="padding:4px 8px;"><input type="email" name="email" value="{{ donation.email }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Phone</th>
-                <td style="padding:4px 8px;"><input type="text" name="phone_number" value="{{ donation.phone_number }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Address</th>
-                <td style="padding:4px 8px;"><input type="text" name="address" value="{{ donation.address }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;"># of Bags</th>
-                <td style="padding:4px 8px;"><input type="number" min="0" name="num_bags" value="{{ donation.num_bags }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;"># of Boxes</th>
-                <td style="padding:4px 8px;"><input type="number" min="0" name="num_boxes" value="{{ donation.num_boxes }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Cash/Check $</th>
-                <td style="padding:4px 8px;"><input type="number" step="0.01" min="0" name="cash_check" value="{{ donation.cash_check }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Gift Cards $</th>
-                <td style="padding:4px 8px;"><input type="number" step="0.01" min="0" name="gift_cards" value="{{ donation.gift_cards }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Other Donation</th>
-                <td style="padding:4px 8px;"><input type="text" name="other_donation" value="{{ donation.other_donation }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px;">Total Weight (lbs)</th>
-                <td style="padding:4px 8px;"><input type="number" step="0.01" min="0" name="total_weight" value="{{ donation.total_weight }}" class="form-control" /></td>
-            </tr>
-            <tr>
-                <th style="text-align:left; padding:4px 8px; vertical-align:top;">Notes</th>
-                <td style="padding:4px 8px;"><textarea name="notes" class="form-control" rows="3">{{ donation.notes }}</textarea></td>
-            </tr>
-        </table>
-    </form>
-    <div id="preview-save-error" style="color:red; margin-top:8px; display:none;"></div>
-    <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
-        <button type="button" class="btn btn-danger" id="delete-donation-btn">&#128465;Delete</button>
-        <div>
-            <button type="button" class="btn btn-success" id="save-donation-btn">&#128190;Save</button>
-            <button type="button" class="btn btn-secondary" onclick="closePreviewModal()">Close</button>
+<div id="donation-preview-inner">
+  <form id="donation-edit-form">
+    {% csrf_token %}
+
+    <div class="det-section">
+      <div class="det-section-title">Donor Information</div>
+      <div class="det-grid">
+        <div class="det-field">
+          <label>Date</label>
+          <input type="date" name="donation_date" value="{{ donation.donation_date|date:'Y-m-d' }}" class="form-control" />
         </div>
+        <div class="det-field">
+          <label>Site</label>
+          <input type="text" value="{{ donation.site.name }}" class="form-control" readonly />
+        </div>
+        <div class="det-field">
+          <label>Donor Name</label>
+          <input type="text" name="donor_name" value="{{ donation.donor_name }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Donor Type</label>
+          <select name="donor_type" class="form-control">
+            {% for value, label in donor_type_choices %}
+            <option value="{{ value }}" {% if donation.donor_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="det-field det-span-2">
+          <label>Organization</label>
+          <input type="text" name="organization" value="{{ donation.organization }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Email</label>
+          <input type="email" name="email" value="{{ donation.email }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Phone</label>
+          <input type="tel" name="phone_number" value="{{ donation.phone_number }}" class="form-control"
+                 pattern="[\+\d][\d\s()\-\.]{6,19}"
+                 title="e.g. 555-123-4567 or (555) 867-5309" />
+        </div>
+        <div class="det-field det-span-2">
+          <label>Address</label>
+          <textarea name="address" class="form-control" rows="3">{{ donation.address }}</textarea>
+        </div>
+      </div>
     </div>
+
+    <div class="det-section">
+      <div class="det-section-title">Donation Details</div>
+      <div class="det-grid-3">
+        <div class="det-field">
+          <label># of Bags</label>
+          <input type="number" min="0" name="num_bags" value="{{ donation.num_bags }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label># of Boxes</label>
+          <input type="number" min="0" name="num_boxes" value="{{ donation.num_boxes }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Cash / Check $</label>
+          <input type="number" step="0.01" min="0" name="cash_check" value="{{ donation.cash_check }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Gift Cards $</label>
+          <input type="number" step="0.01" min="0" name="gift_cards" value="{{ donation.gift_cards }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Other Donation</label>
+          <input type="text" name="other_donation" value="{{ donation.other_donation }}" class="form-control" />
+        </div>
+        <div class="det-field">
+          <label>Total Weight (lbs)</label>
+          <input type="number" step="0.01" min="0" name="total_weight" value="{{ donation.total_weight }}" class="form-control" />
+        </div>
+      </div>
+      <div class="det-field">
+        <label>Notes</label>
+        <textarea name="notes" class="form-control" rows="3"
+          placeholder="Add details such as item condition, quantity notes, or handling instructions.">{{ donation.notes }}</textarea>
+      </div>
+    </div>
+  </form>
+
+  <div id="preview-save-error" class="det-error" style="display:none;"></div>
+
+  <div class="det-actions">
+    <button type="button" class="det-btn det-btn-danger" id="delete-donation-btn">Delete Donation</button>
+    <div class="det-actions-right">
+      <button type="button" class="det-btn det-btn-primary" id="save-donation-btn">Save Changes</button>
+      <button type="button" class="det-btn det-btn-secondary" onclick="closePreviewModal()">Close</button>
+    </div>
+  </div>
 </div>
+
 <script>
-(function() {
+(function () {
     function getCsrf() {
         const el = document.querySelector('#donation-edit-form [name=csrfmiddlewaretoken]');
         return el ? el.value : '';
     }
 
-    document.getElementById('save-donation-btn').onclick = function() {
+    document.getElementById('save-donation-btn').onclick = function () {
         const form = document.getElementById('donation-edit-form');
         const data = new FormData(form);
         const errBox = document.getElementById('preview-save-error');
@@ -114,7 +127,7 @@
         });
     };
 
-    document.getElementById('delete-donation-btn').onclick = function() {
+    document.getElementById('delete-donation-btn').onclick = function () {
         if (!confirm('Delete this donation? This cannot be undone.')) return;
         fetch('{% url "donation-delete" donation.pk %}', {
             method: 'POST',

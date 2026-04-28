@@ -3,176 +3,680 @@
 {% block title %}New Donation{% endblock %}
 
 {% block content %}
-<div class="panel">
-    <h2 style="margin-top: 0;">Donation Intake</h2>
+<style>
+/* ── Wizard wrapper ───────────────────────────────────── */
+.wz-wrap {
+  max-width: 560px;
+  margin: 2rem auto;
+}
 
+/* ── Step indicator ───────────────────────────────────── */
+.wz-track {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin-bottom: 1.75rem;
+}
+.wz-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.wz-bubble {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.88rem;
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+  position: relative;
+  z-index: 1;
+}
+.wz-node.active .wz-bubble,
+.wz-node.done .wz-bubble {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.wz-node-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.wz-node.active .wz-node-label {
+  color: var(--primary);
+}
+.wz-connector {
+  flex: 0 0 72px;
+  height: 2px;
+  background: var(--line);
+  margin-top: 17px; /* aligns with bubble center */
+  transition: background 0.3s;
+}
+.wz-connector.done {
+  background: var(--primary);
+}
 
-    {% if success %}
-        <div class="alert alert-success" style="margin-bottom: 16px;">Donation saved successfully.</div>
-    {% endif %}
-    <form method="post" novalidate>
-        {% csrf_token %}
+/* ── Card ─────────────────────────────────────────────── */
+.wz-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(20, 40, 60, 0.07);
+  padding: 2rem 2rem 1.75rem;
+  overflow: hidden;
+}
+.wz-card h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+}
 
-        <div class="grid">
-            {% if site %}
-            <div class="form-row">
-                <label>Site Name</label>
-                <div style="padding: 8px 0 8px 0; font-weight: bold;">{{ site.name }}</div>
-            </div>
-            {% endif %}
-            <div class="form-row">
-                <label for="id_donation_date">Date</label>
-                {{ form.donation_date.errors }}
-                {{ form.donation_date }}
-            </div>
-            <div class="form-row">
-                <label for="id_donor_name">Donor Name</label>
-                {{ form.donor_name.errors }}
-                {{ form.donor_name }}
-                <datalist id="donor-name-suggestions"></datalist>
-            </div>
-            <div class="form-row">
-                <label>Donor Type</label>
-                {{ form.donor_type.errors }}
-                {{ form.donor_type }}
-            </div>
-            <div class="form-row">
-                <label for="id_organization">Organization</label>
-                {{ form.organization.errors }}
-                {{ form.organization }}
-            </div>
-            <div class="form-row">
-                <label for="id_email">Email</label>
-                {{ form.email.errors }}
-                {{ form.email }}
-                <datalist id="donor-email-suggestions"></datalist>
-            </div>
-            <div class="form-row">
-                <label for="id_phone_number">Phone Number</label>
-                {{ form.phone_number.errors }}
-                {{ form.phone_number }}
-            </div>
-            <div class="form-row">
-                <label for="id_address">Address</label>
-                {{ form.address.errors }}
-                {{ form.address }}
-            </div>
+/* ── Step panels ──────────────────────────────────────── */
+.wz-step { display: none; }
+.wz-step.active {
+  display: block;
+  animation: wzFadeUp 0.28s ease;
+}
+@keyframes wzFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Consistent field styling ─────────────────────────── */
+.wz-field {
+  margin-bottom: 1rem;
+}
+.wz-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.wz-field .wz-static {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 8px 0;
+}
+/* Override base form-control styles inside wizard */
+.wz-field input.form-control,
+.wz-field select.form-control,
+.wz-field textarea.form-control {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  outline: none;
+  box-shadow: none;
+}
+.wz-field input.form-control:focus,
+.wz-field select.form-control:focus,
+.wz-field textarea.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(97, 117, 37, 0.14);
+}
+.wz-field input.form-control.wz-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.1);
+}
+.wz-field select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23637381' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+.wz-field textarea.form-control {
+  resize: vertical;
+  min-height: 88px;
+}
+.wz-field .errorlist {
+  margin: 0 0 5px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+/* ── Conditional field groups ─────────────────────────── */
+.cond-group {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.cond-group.open {
+  max-height: 700px;
+  opacity: 1;
+}
+/* transitions applied via JS after initial render to avoid flash */
+.cond-group.animated {
+  transition: max-height 0.35s ease, opacity 0.3s ease;
+}
+
+/* ── 2-column grid for donation amounts ───────────────── */
+.wz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.25rem;
+}
+@media (max-width: 480px) {
+  .wz-grid { grid-template-columns: 1fr; }
+  .wz-card { padding: 1.5rem 1.25rem 1.25rem; }
+}
+
+/* ── Step navigation bar ──────────────────────────────── */
+.wz-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.wz-nav.wz-nav-split {
+  justify-content: space-between;
+}
+
+/* ── Inline field errors ─────────────────────────────── */
+.wz-field-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+  font-weight: 500;
+  margin-bottom: 4px;
+  /* takes no space when empty */
+}
+
+/* ── Buttons ──────────────────────────────────────────── */
+.wz-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1.5px solid transparent;
+  line-height: 1;
+}
+.wz-btn:active { transform: scale(0.97); }
+.wz-btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.wz-btn-primary:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+.wz-btn-secondary {
+  background: #fff;
+  color: var(--text);
+  border-color: var(--line);
+}
+.wz-btn-secondary:hover { background: var(--bg); }
+
+/* ── Non-field errors ─────────────────────────────────── */
+.wz-form-errors {
+  background: #fdf2f2;
+  border: 1px solid #f5c6c6;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+.wz-form-errors ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── Autocomplete dropdown ────────────────────────────── */
+.ac-box {
+  position: absolute;
+  z-index: 9999;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(20,40,60,0.13);
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.ac-row {
+  padding: 9px 13px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.1s;
+}
+.ac-row:last-child { border-bottom: none; }
+.ac-row:hover, .ac-row-hl { background: var(--bg, #f7f9fb); }
+.ac-row-name { font-weight: 600; color: var(--text); font-size: 0.9rem; }
+.ac-row-sub  { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+.ac-msg { padding: 9px 13px; color: var(--muted); font-size: 0.85rem; }
+@keyframes acFlash {
+  0%   { background-color: rgba(97,117,37,0.18); }
+  100% { background-color: transparent; }
+}
+.ac-filled { animation: acFlash 0.65s ease forwards; }
+</style>
+
+<div class="wz-wrap">
+
+  <!-- Step indicator -->
+  <div class="wz-track">
+    <div class="wz-node active" id="wz-sn1">
+      <div class="wz-bubble">1</div>
+      <div class="wz-node-label">Donor</div>
+    </div>
+    <div class="wz-connector" id="wz-sc1"></div>
+    <div class="wz-node" id="wz-sn2">
+      <div class="wz-bubble">2</div>
+      <div class="wz-node-label">Donation</div>
+    </div>
+  </div>
+
+  {% if success %}
+  <div class="alert alert-success" style="margin-bottom: 1rem;">Donation saved successfully.</div>
+  {% endif %}
+
+  <div class="wz-card">
+    <form method="post" novalidate id="wz-form">
+      {% csrf_token %}
+
+      <!-- ══════════════════════════════════════════════ -->
+      <!--  STEP 1 — Donor Identity                       -->
+      <!-- ══════════════════════════════════════════════ -->
+      <div class="wz-step active" id="wz-step1">
+        <h2>Donor Identity</h2>
+
+        {% if site %}
+        <div class="wz-field">
+          <label>Site Name</label>
+          <div class="wz-static">{{ site.name }}</div>
+        </div>
+        {% endif %}
+
+        <div class="wz-field">
+          <label for="id_donation_date">Date</label>
+          {{ form.donation_date.errors }}
+          {{ form.donation_date }}
         </div>
 
-        <hr style="margin: 2em 0;">
-
-        <div class="grid">
-            <div class="form-row">
-                <label for="id_num_bags"># of Bags</label>
-                {{ form.num_bags.errors }}
-                {{ form.num_bags }}
-            </div>
-            <div class="form-row">
-                <label for="id_num_boxes"># of Boxes</label>
-                {{ form.num_boxes.errors }}
-                {{ form.num_boxes }}
-            </div>
-            <div class="form-row">
-                <label for="id_cash_check">Cash/Check $</label>
-                {{ form.cash_check.errors }}
-                {{ form.cash_check }}
-            </div>
-            <div class="form-row">
-                <label for="id_gift_cards">Gift Cards $</label>
-                {{ form.gift_cards.errors }}
-                {{ form.gift_cards }}
-            </div>
-            <div class="form-row">
-                <label for="id_other_donation">Other Donation</label>
-                {{ form.other_donation.errors }}
-                {{ form.other_donation }}
-            </div>
-            <div class="form-row">
-                <label for="id_total_weight">Total Weight (lbs)</label>
-                {{ form.total_weight.errors }}
-                {{ form.total_weight }}
-            </div>
+        <div class="wz-field">
+          <label for="id_donor_type">Donor Type</label>
+          {{ form.donor_type.errors }}
+          {{ form.donor_type }}
         </div>
 
-        <div class="form-row">
-            <label for="id_notes">Notes</label>
-            {{ form.notes.errors }}
-            {{ form.notes }}
-            <div class="help">Add details such as item condition, quantity notes, or handling instructions.</div>
+        <!-- Donor Name — shown for Individual + org types -->
+        <div class="cond-group" id="cg-name">
+          <div class="wz-field">
+            <label for="id_donor_name">Donor Name</label>
+            {{ form.donor_name.errors }}
+            {{ form.donor_name }}
+          </div>
         </div>
 
-        <button class="btn" type="submit">Save Donation</button>
-        <a class="btn btn-secondary" href="{% url 'donation-log' %}">View Log</a>
+        <!-- Organization — shown only for non-Anonymous, non-Individual -->
+        <div class="cond-group" id="cg-org">
+          <div class="wz-field">
+            <label for="id_organization">Organization</label>
+            {{ form.organization.errors }}
+            {{ form.organization }}
+          </div>
+        </div>
+
+        <!-- Email / Phone / Address — shown for Individual + org types -->
+        <div class="cond-group" id="cg-contact">
+          <div class="wz-field">
+            <label for="id_email">Email</label>
+            <div class="wz-field-error" id="err-email"></div>
+            {{ form.email.errors }}
+            {{ form.email }}
+          </div>
+          <div class="wz-field">
+            <label for="id_phone_number">Phone Number</label>
+            <div class="wz-field-error" id="err-phone"></div>
+            {{ form.phone_number.errors }}
+            {{ form.phone_number }}
+          </div>
+          <div class="wz-field">
+            <label for="id_address">Address</label>
+            {{ form.address.errors }}
+            {{ form.address }}
+          </div>
+        </div>
+
+        <div class="wz-nav">
+          <button type="button" class="wz-btn wz-btn-primary" id="btn-next">Next →</button>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════ -->
+      <!--  STEP 2 — Donation Information                 -->
+      <!-- ══════════════════════════════════════════════ -->
+      <div class="wz-step" id="wz-step2">
+        <h2>Donation Information</h2>
+
+        {% if form.non_field_errors %}
+        <div class="wz-form-errors">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="wz-grid">
+          <div class="wz-field">
+            <label for="id_num_bags"># of Bags</label>
+            {{ form.num_bags.errors }}
+            {{ form.num_bags }}
+          </div>
+          <div class="wz-field">
+            <label for="id_num_boxes"># of Boxes</label>
+            {{ form.num_boxes.errors }}
+            {{ form.num_boxes }}
+          </div>
+          <div class="wz-field">
+            <label for="id_cash_check">Cash / Check $</label>
+            {{ form.cash_check.errors }}
+            {{ form.cash_check }}
+          </div>
+          <div class="wz-field">
+            <label for="id_gift_cards">Gift Cards $</label>
+            {{ form.gift_cards.errors }}
+            {{ form.gift_cards }}
+          </div>
+          <div class="wz-field">
+            <label for="id_other_donation">Other Donation</label>
+            {{ form.other_donation.errors }}
+            {{ form.other_donation }}
+          </div>
+          <div class="wz-field">
+            <label for="id_total_weight">Total Weight (lbs)</label>
+            {{ form.total_weight.errors }}
+            {{ form.total_weight }}
+          </div>
+        </div>
+
+        <div class="wz-field">
+          <label for="id_notes">Notes</label>
+          {{ form.notes.errors }}
+          {{ form.notes }}
+        </div>
+
+        <div class="wz-field" style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          {{ form.opt_in_email }}
+          <label for="id_opt_in_email" style="margin:0;font-weight:normal;cursor:pointer;">
+            Send confirmation email to donor
+          </label>
+        </div>
+
+        <div class="wz-nav wz-nav-split">
+          <button type="button" class="wz-btn wz-btn-secondary" id="btn-back">← Back</button>
+          <button type="submit" class="wz-btn wz-btn-primary">Save Donation</button>
+        </div>
+      </div>
+
     </form>
+  </div>
 </div>
 
 <script>
 (() => {
-    const donorInput = document.getElementById("id_donor_name");
-    const emailInput = document.getElementById("id_email");
-    const nameList = document.getElementById("donor-name-suggestions");
-    const emailList = document.getElementById("donor-email-suggestions");
+  /* ── Element references ───────────────────────────── */
+  const step1      = document.getElementById("wz-step1");
+  const step2      = document.getElementById("wz-step2");
+  const sn1        = document.getElementById("wz-sn1");
+  const sn2        = document.getElementById("wz-sn2");
+  const sc1        = document.getElementById("wz-sc1");
+  const btnNext    = document.getElementById("btn-next");
+  const btnBack    = document.getElementById("btn-back");
+  const typeSelect = document.getElementById("id_donor_type");
+  const dateInput  = document.getElementById("id_donation_date");
+  const emailInput = document.getElementById("id_email");
+  const phoneInput = document.getElementById("id_phone_number");
+  const donorInput = document.getElementById("id_donor_name");
+  const cgName     = document.getElementById("cg-name");
+  const cgOrg      = document.getElementById("cg-org");
+  const cgContact  = document.getElementById("cg-contact");
+  const errEmail   = document.getElementById("err-email");
+  const errPhone   = document.getElementById("err-phone");
 
-    let donorMap = {};
+  const ORG_TYPES = new Set(["Civic", "Religious", "Corporate"]);
 
-    const updateLists = async (value) => {
-        if (!value || value.length < 1) {
-            nameList.innerHTML = "";
-            emailList.innerHTML = "";
-            donorMap = {};
-            return;
-        }
+  /* ── Conditional field reveal ─────────────────────── */
+  function setOpen(el, open) { el.classList.toggle("open", open); }
 
-        const res = await fetch(`/api/donor-suggestions/?q=${encodeURIComponent(value)}`);
-        if (!res.ok) {
-            return;
-        }
+  function applyDonorType(val) {
+    const showPersonal = val === "Individual" || ORG_TYPES.has(val);
+    setOpen(cgName,    showPersonal);
+    setOpen(cgOrg,     ORG_TYPES.has(val));
+    setOpen(cgContact, showPersonal);
+  }
 
-        const payload = await res.json();
-        donorMap = {};
-        nameList.innerHTML = "";
-        emailList.innerHTML = "";
+  applyDonorType(typeSelect.value);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      cgName.classList.add("animated");
+      cgOrg.classList.add("animated");
+      cgContact.classList.add("animated");
+    });
+  });
+  typeSelect.addEventListener("change", () => applyDonorType(typeSelect.value));
 
-        (payload.results || []).forEach((item) => {
-            const donorName = item.donor_name || "";
-            const donorEmail = item.email || "";
+  /* ── Step navigation ──────────────────────────────── */
+  function goToStep2() {
+    step1.classList.remove("active"); step2.classList.add("active");
+    sn1.classList.remove("active");   sn1.classList.add("done");
+    sn2.classList.add("active");      sc1.classList.add("done");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function goToStep1() {
+    step2.classList.remove("active"); step1.classList.add("active");
+    sn2.classList.remove("active");   sn1.classList.remove("done");
+    sn1.classList.add("active");      sc1.classList.remove("done");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-            if (donorName) {
-                const optName = document.createElement("option");
-                optName.value = donorName;
-                optName.label = donorEmail ? `${donorName} (${donorEmail})` : donorName;
-                nameList.appendChild(optName);
-            }
+  /* ── Validation helpers ───────────────────────────── */
+  const PHONE_RE  = /^\+?[\d\s()\-\.]{7,20}$/;
+  const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const PHONE_MSG = "Enter a valid phone number (e.g. 555-123-4567).";
+  const EMAIL_MSG = "Enter a valid email address (e.g. name@example.com).";
 
-            if (donorEmail) {
-                const optEmail = document.createElement("option");
-                optEmail.value = donorEmail;
-                optEmail.label = donorName ? `${donorEmail} (${donorName})` : donorEmail;
-                emailList.appendChild(optEmail);
-            }
+  // Empty = OK (field is optional). Non-empty must match regex.
+  // Shows error text above the input; clears it when valid.
+  function checkOptional(input, regex, errEl, msg) {
+    const val = input.value.trim();
+    const ok  = !val || regex.test(val);
+    input.classList.toggle("wz-error", !ok);
+    errEl.textContent = ok ? "" : msg;
+    return ok;
+  }
 
-            if (donorName || donorEmail) {
-                donorMap[donorName] = donorEmail;
-                donorMap[donorEmail] = donorName;
-            }
-        });
+  /* ── Next button ──────────────────────────────────── */
+  btnNext.addEventListener("click", () => {
+    let valid = true;
+
+    const dateOk = !!dateInput.value.trim();
+    dateInput.classList.toggle("wz-error", !dateOk);
+    if (!dateOk) valid = false;
+
+    if (cgContact.classList.contains("open")) {
+      if (!checkOptional(emailInput, EMAIL_RE, errEmail, EMAIL_MSG)) valid = false;
+      if (!checkOptional(phoneInput, PHONE_RE, errPhone, PHONE_MSG)) valid = false;
+    }
+
+    if (valid) goToStep2();
+  });
+
+  // Clear errors as the user types
+  dateInput.addEventListener("input",  () => { if (dateInput.value.trim()) dateInput.classList.remove("wz-error"); });
+  phoneInput.addEventListener("input", () => checkOptional(phoneInput, PHONE_RE, errPhone, PHONE_MSG));
+
+  btnBack.addEventListener("click", goToStep1);
+
+  // If Django re-rendered with step-2 errors, jump straight to step 2
+  if (step2.querySelectorAll(".errorlist, .wz-form-errors").length > 0) goToStep2();
+
+  /* ── Notes placeholder ────────────────────────────── */
+  const notesEl = document.getElementById("id_notes");
+  if (notesEl && !notesEl.placeholder) {
+    notesEl.placeholder = "Add details such as item condition, quantity notes, or handling instructions.";
+  }
+
+  // Email: live regex validation
+  emailInput.addEventListener("input", (e) => {
+    checkOptional(e.target, EMAIL_RE, errEmail, EMAIL_MSG);
+  });
+})();
+
+/* ── Rich donor autocomplete dropdowns ─────────────── */
+(function () {
+  const AC_URL     = '/api/donor-autocomplete/';
+  const MIN_CHARS  = 2;
+  const DEBOUNCE   = 300;
+
+  const fields = [
+    { el: document.getElementById('id_donor_name'),   field: 'name'  },
+    { el: document.getElementById('id_email'),         field: 'email' },
+    { el: document.getElementById('id_phone_number'),  field: 'phone' },
+  ];
+
+  // Inject absolutely-positioned dropdown box below each input
+  fields.forEach(f => {
+    const box = document.createElement('div');
+    box.className = 'ac-box';
+    box.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;margin-top:2px;z-index:9999;';
+    f.box = box;
+    f.hlIndex = -1;
+    f.el.parentNode.style.position = 'relative';
+    f.el.parentNode.appendChild(box);
+  });
+
+  let timer = null;
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function fill(donor) {
+    const map = {
+      id_donor_name:   donor.name         || '',
+      id_email:        donor.email        || '',
+      id_phone_number: donor.phone        || '',
+      id_address:      donor.address      || '',
+      id_organization: donor.organization || '',
     };
+    Object.entries(map).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el && val) {
+        el.value = val;
+        el.classList.add('ac-filled');
+        setTimeout(() => el.classList.remove('ac-filled'), 700);
+      }
+    });
+  }
 
-    donorInput.addEventListener("input", (event) => {
-        updateLists(event.target.value);
-        const matchedEmail = donorMap[event.target.value];
-        if (matchedEmail && !emailInput.value) {
-            emailInput.value = matchedEmail;
-        }
+  function render(f, data) {
+    const box = f.box;
+    box.innerHTML = '';
+    f.hlIndex = -1;
+    if (!data.length) {
+      box.innerHTML = '<div class="ac-msg">No matching donors found</div>';
+    } else {
+      data.forEach(donor => {
+        const row = document.createElement('div');
+        row.className = 'ac-row';
+        const sub = [donor.email, donor.phone].filter(Boolean).join(' · ');
+        row.innerHTML =
+          `<div class="ac-row-name">${esc(donor.name || '')}</div>` +
+          `<div class="ac-row-sub">${esc(sub)}</div>`;
+        row.addEventListener('mousedown', e => { e.preventDefault(); fill(donor); closeAll(); });
+        box.appendChild(row);
+      });
+    }
+    box.style.display = 'block';
+  }
+
+  function closeAll() {
+    fields.forEach(f => { f.box.style.display = 'none'; f.hlIndex = -1; });
+  }
+
+  function fetchFor(f) {
+    const q = f.el.value.trim();
+    if (q.length < MIN_CHARS) { f.box.style.display = 'none'; return; }
+    f.box.innerHTML = '<div class="ac-msg">Searching…</div>';
+    f.box.style.display = 'block';
+    fetch(`${AC_URL}?q=${encodeURIComponent(q)}&field=${f.field}`)
+      .then(r => r.json())
+      .then(data => { if (f.el.value.trim().length >= MIN_CHARS) render(f, data); })
+      .catch(() => { f.box.style.display = 'none'; });
+  }
+
+  fields.forEach(f => {
+    f.el.addEventListener('input', () => {
+      clearTimeout(timer);
+      if (f.el.value.trim().length < MIN_CHARS) { f.box.style.display = 'none'; return; }
+      timer = setTimeout(() => fetchFor(f), DEBOUNCE);
     });
 
-    emailInput.addEventListener("input", (event) => {
-        updateLists(event.target.value);
-        const matchedName = donorMap[event.target.value];
-        if (matchedName && !donorInput.value) {
-            donorInput.value = matchedName;
-        }
+    f.el.addEventListener('keydown', e => {
+      if (f.box.style.display === 'none') return;
+      const rows = Array.from(f.box.querySelectorAll('.ac-row'));
+      if (!rows.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        f.hlIndex = Math.min(f.hlIndex + 1, rows.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        f.hlIndex = Math.max(f.hlIndex - 1, 0);
+      } else if (e.key === 'Enter' && f.hlIndex >= 0) {
+        e.preventDefault();
+        rows[f.hlIndex].dispatchEvent(new MouseEvent('mousedown'));
+        return;
+      } else if (e.key === 'Escape') {
+        f.box.style.display = 'none';
+        return;
+      }
+      rows.forEach((r, i) => r.classList.toggle('ac-row-hl', i === f.hlIndex));
     });
+
+    f.el.addEventListener('blur', () => setTimeout(() => { f.box.style.display = 'none'; }, 160));
+  });
+
+  document.addEventListener('click', e => {
+    fields.forEach(f => {
+      if (!f.el.contains(e.target) && !f.box.contains(e.target)) {
+        f.box.style.display = 'none';
+      }
+    });
+  });
 })();
 </script>
+
 {% endblock %}

@@ -1,7 +1,13 @@
 from django import forms
+from django.core.validators import RegexValidator
 from django.db.utils import OperationalError, ProgrammingError
 
 from .models import Donation, Site
+
+_phone_validator = RegexValidator(
+    regex=r'^\+?[\d\s()\-\.]{7,20}$',
+    message="Enter a valid phone number (e.g. 555-123-4567 or (555) 867-5309).",
+)
 
 
 
@@ -20,6 +26,7 @@ class DonationForm(forms.ModelForm):
         return cleaned_data
     donor_type = forms.ChoiceField(
         choices=[
+            ("Anonymous", "Anonymous"),
             ("Civic", "Civic"),
             ("Religious", "Religious"),
             ("Corporate", "Corporate"),
@@ -46,9 +53,11 @@ class DonationForm(forms.ModelForm):
             "other_donation",
             "total_weight",
             "notes",
+            "opt_in_email",
         ]
         widgets = {
             "donation_date": forms.DateInput(attrs={"type": "date"}),
+            "address": forms.Textarea(attrs={"rows": 3}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
 
@@ -72,6 +81,13 @@ class DonationForm(forms.ModelForm):
         self.fields["gift_cards"].required = False
         self.fields["other_donation"].required = False
         self.fields["total_weight"].required = False
-        self.fields["notes"].widget.attrs["list"] = "donor-name-suggestions"
-        self.fields["email"].widget.attrs["list"] = "donor-email-suggestions"
+        self.fields["opt_in_email"].required = False
+        self.fields["opt_in_email"].label = "Send confirmation email to donor"
+        self.fields["opt_in_email"].widget.attrs.pop("class", None)  # no form-control on checkbox
+        self.fields["email"].widget.attrs["pattern"] = r"[^\s@]+@[^\s@]+\.[^\s@]{2,}"
+        self.fields["email"].widget.attrs["title"] = "e.g. name@example.com"
+        self.fields["phone_number"].validators.append(_phone_validator)
+        self.fields["phone_number"].widget.attrs["type"] = "tel"
+        self.fields["phone_number"].widget.attrs["pattern"] = r"[\+\d][\d\s()\-\.]{6,19}"
+        self.fields["phone_number"].widget.attrs["title"] = "e.g. 555-123-4567 or (555) 867-5309"
 
