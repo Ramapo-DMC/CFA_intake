@@ -25,8 +25,7 @@ SECRET_KEY = "django-insecure-)2ty)r=2=h0hl+*)8kjj*@qs$usuj8#1(m!nff*o*(2l=(ul1@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['cfa-inkind.ramapo-dmc.dev', 'localhost', '127.0.0.1']
 
 # Application definition
 
@@ -123,3 +122,10 @@ DEFAULT_FROM_EMAIL = "donations@cfa.local"
 
 LOGIN_REDIRECT_URL = "donation-create"
 LOGOUT_REDIRECT_URL = "login"
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://cfa-inkind.ramapo-dmc.dev',
+    'http://cfa-inkind.ramapo-dmc.dev',  # optional, for HTTP
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
