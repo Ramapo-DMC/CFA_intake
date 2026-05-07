@@ -283,6 +283,112 @@
   100% { background-color: transparent; }
 }
 .ac-filled { animation: acFlash 0.65s ease forwards; }
+
+/* ── Donation success modal ───────────────────────── */
+#don-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 30, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: donFadeIn 0.2s ease;
+}
+@keyframes donFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+#don-modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(10, 20, 30, 0.25);
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem 2rem 1.75rem;
+  text-align: center;
+  animation: donSlideUp 0.25s ease;
+}
+@keyframes donSlideUp {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.don-check {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #e8f5e2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.1rem;
+}
+.don-check svg { display: block; }
+#don-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.don-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 1.1rem 0 0.5rem;
+}
+.don-number {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--primary, #617525);
+  line-height: 1;
+}
+.don-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1.5px solid var(--line, #dde3e8);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted, #637381);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.don-copy-btn:hover { background: var(--bg, #f5f7f9); color: var(--text); }
+.don-copy-btn.copied { border-color: var(--primary, #617525); color: var(--primary, #617525); }
+.don-label {
+  font-size: 1rem;
+  color: var(--text);
+  margin: 0 0 0.35rem;
+}
+.don-hint {
+  font-size: 0.84rem;
+  color: var(--muted, #637381);
+  margin: 0 0 1.6rem;
+}
+.don-ok-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 36px;
+  border-radius: 9px;
+  background: var(--primary, #617525);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.don-ok-btn:hover { background: var(--primary-strong, #4e5f1e); }
 </style>
 
 <div class="wz-wrap">
@@ -300,8 +406,30 @@
     </div>
   </div>
 
-  {% if success %}
-  <div class="alert alert-success" style="margin-bottom: 1rem;">Donation saved successfully.</div>
+  {% if success and cdonation_number %}
+  <div id="don-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="don-modal-title">
+    <div id="don-modal">
+      <div class="don-check">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <path d="M5 13.5L10.5 19L21 8" stroke="#3a7d1e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2 id="don-modal-title">Donation Logged Successfully</h2>
+      <p class="don-label">Your donation number is:</p>
+      <div class="don-number-row">
+        <span class="don-number" id="don-num-display">{{ cdonation_number }}</span>
+        <button type="button" class="don-copy-btn" id="don-copy-btn" aria-label="Copy donation number">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M1 9V2a1 1 0 0 1 1-1h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          Copy
+        </button>
+      </div>
+      <p class="don-hint">Please attach this number to the donation items.</p>
+      <button type="button" class="don-ok-btn" id="don-ok-btn">OK</button>
+    </div>
+  </div>
   {% endif %}
 
   <div class="wz-card">
@@ -677,6 +805,66 @@
     });
   });
 })();
+
+/* ── Donation success modal ───────────────────────── */
+{% if success and cdonation_number %}
+(function () {
+  const backdrop = document.getElementById('don-modal-backdrop');
+  const okBtn    = document.getElementById('don-ok-btn');
+  const copyBtn  = document.getElementById('don-copy-btn');
+  const numText  = document.getElementById('don-num-display').textContent.trim();
+
+  function closeModal() {
+    backdrop.style.animation = 'donFadeIn 0.18s ease reverse';
+    setTimeout(() => backdrop.remove(), 180);
+  }
+
+  okBtn.addEventListener('click', closeModal);
+
+  // Close on backdrop click (not on the card itself)
+  backdrop.addEventListener('click', function (e) {
+    if (e.target === backdrop) closeModal();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function handler(e) {
+    if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', handler); }
+  });
+
+  // Copy button
+  copyBtn.addEventListener('click', function () {
+    navigator.clipboard.writeText(numText).then(function () {
+      copyBtn.textContent = '✔ Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(function () {
+        copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M1 9V2a1 1 0 0 1 1-1h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Copy';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    }).catch(function () {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = numText;
+      ta.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      copyBtn.textContent = '✔ Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(function () {
+        copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M1 9V2a1 1 0 0 1 1-1h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Copy';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    });
+  });
+
+  // Replace the current history entry so a browser refresh does a GET,
+  // preventing the "Resubmit form?" dialog and duplicate modal.
+  if (history.replaceState) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+})();
+{% endif %}
 </script>
 
 {% endblock %}

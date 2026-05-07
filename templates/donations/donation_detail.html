@@ -192,6 +192,10 @@
             <input type="text" value="{{ donation.site.name }}" class="form-control" readonly />
           </div>
           <div class="det-field">
+            <label>Donation #</label>
+            <input type="text" value="{{ donation.cdonation_number|default:'—' }}" class="form-control" readonly />
+          </div>
+          <div class="det-field">
             <label>Donor Name</label>
             <input type="text" name="donor_name" value="{{ donation.donor_name }}" class="form-control" />
           </div>

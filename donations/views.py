@@ -218,7 +218,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 
 from .forms import DonationForm
-from .models import Donation, Site
+from .models import Donation, Site, get_next_cdonation_number
 
 
 def home(request):
@@ -251,13 +251,16 @@ def donation_create(request):
     except Site.DoesNotExist:
         return redirect("site-select")
     success = False
+    cdonation_number = None
     if request.method == "POST":
         form = DonationForm(request.POST)
         if form.is_valid():
             donation = form.save(commit=False)
             donation.site = site
+            donation.cdonation_number = get_next_cdonation_number()
             donation.save()
             success = True
+            cdonation_number = donation.cdonation_number
             if donation.email:
                 gift = _format_gift_description(donation)
                 name = donation.donor_name or "Friend"
@@ -303,7 +306,7 @@ def donation_create(request):
     else:
         form = DonationForm(initial={"donation_date": date.today()})
 
-    return render(request, "donations/donation_form.html", {"form": form, "success": success, "site": site})
+    return render(request, "donations/donation_form.html", {"form": form, "success": success, "site": site, "cdonation_number": cdonation_number})
 
 
 @login_required

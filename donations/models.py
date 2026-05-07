@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 
 
 class Site(models.Model):
@@ -39,9 +39,34 @@ class Donation(models.Model):
     opt_in_email = models.BooleanField(default=False)
     unsubscribe = models.BooleanField(default=False)
     unsubscribe_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    cdonation_number = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["-donation_date", "-created_at"]
 
     def __str__(self) -> str:
         return f"{self.donor_name} ({self.donation_date})"
+
+
+class DonationCounter(models.Model):
+    """Singleton row used as a concurrency-safe cycling counter (1–500)."""
+    current = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "donation counter"
+
+
+def get_next_cdonation_number() -> int:
+    """
+    Return the next cdonation_number in the cycle 1–500, wrapping 500 → 1.
+    Uses SELECT FOR UPDATE to prevent two concurrent donations from receiving
+    the same number.
+    """
+    with transaction.atomic():
+        counter, _ = DonationCounter.objects.select_for_update().get_or_create(
+            id=1, defaults={"current": 0}
+        )
+        next_num = (counter.current % 500) + 1
+        counter.current = next_num
+        counter.save(update_fields=["current"])
+    return next_num
