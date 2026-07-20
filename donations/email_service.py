@@ -22,8 +22,8 @@ SENDER_NAME = "CFA"
 SENDER_EMAIL = "cfa@ramapo-dmc.dev"
 _DEFAULT_OVERRIDE = "tnosrati@ramapo.edu"
 
-# Address CC'd on every donation receipt (live mode only).
-RECEIPT_CC_EMAIL = "vpaulson@cfanj.org"
+# Addresses CC'd on every donation receipt (live mode only).
+RECEIPT_CC_EMAILS = ["vpaulson@cfanj.org", "sfrees@ramapo.edu"]
 
 
 # ---------------------------------------------------------------------------
@@ -192,9 +192,9 @@ def send_email(
     # CC a fixed monitoring address on every receipt, but only when sending for
     # real – in non-live mode we don't want to email the real CC recipient.
     cc = None
-    if _is_live() and RECEIPT_CC_EMAIL:
-        cc = [{"email": RECEIPT_CC_EMAIL}]
-        logger.info("CC'ing receipt to %s", RECEIPT_CC_EMAIL)
+    if _is_live() and RECEIPT_CC_EMAILS:
+        cc = [{"email": addr} for addr in RECEIPT_CC_EMAILS]
+        logger.info("CC'ing receipt to %s", ", ".join(RECEIPT_CC_EMAILS))
 
     # --- send ----------------------------------------------------------------
     api = _get_brevo_api()
