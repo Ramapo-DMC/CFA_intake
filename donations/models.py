@@ -36,7 +36,7 @@ class Donation(models.Model):
     total_weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Total Weight (lbs)")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    opt_in_email = models.BooleanField(default=False)
+    opt_in_email = models.BooleanField(default=True)
     unsubscribe = models.BooleanField(default=False)
     unsubscribe_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     cdonation_number = models.PositiveSmallIntegerField(null=True, blank=True)
