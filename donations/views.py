@@ -1,5 +1,6 @@
 
 import csv
+import logging
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -13,6 +14,8 @@ from .models import Donation, Site
 from .forms import DonationForm
 from .site_select_form import SiteSelectForm
 from .email_service import send_email
+
+logger = logging.getLogger(__name__)
 
 
 def _format_gift_description(donation) -> str:
@@ -292,16 +295,43 @@ def donation_create(request):
   </p>
 </div>
 """
+                logger.info(
+                    "Attempting donation receipt email | donation pk=%s | "
+                    "cdonation=%s | to=%s | opt_in=%s | unsubscribed=%s",
+                    donation.pk,
+                    cdonation_number,
+                    donation.email,
+                    donation.opt_in_email,
+                    donation.unsubscribe,
+                )
                 try:
-                    send_email(
+                    result = send_email(
                         recipient_email=donation.email,
                         recipient_name=donation.donor_name,
                         subject="Thank You for Your Donation to Center for Food Action",
                         html_content=html_body,
                         donation=donation,
                     )
+                    if result is None:
+                        logger.info(
+                            "Receipt email not sent for donation pk=%s "
+                            "(skipped by eligibility check – see preceding log line)",
+                            donation.pk,
+                        )
+                    else:
+                        logger.info(
+                            "Receipt email dispatched for donation pk=%s", donation.pk
+                        )
                 except Exception:
-                    pass  # email failure should not block the donation save
+                    # Email failure must not block the donation save, but it must
+                    # never be silent – log the full traceback so it's visible in
+                    # the server logs (journalctl on production).
+                    logger.exception(
+                        "Receipt email FAILED for donation pk=%s (to=%s). "
+                        "Donation was still saved.",
+                        donation.pk,
+                        donation.email,
+                    )
             form = DonationForm(initial={"donation_date": date.today()})
     else:
         form = DonationForm(initial={"donation_date": date.today()})
