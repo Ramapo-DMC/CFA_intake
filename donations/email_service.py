@@ -42,7 +42,17 @@ def _get_final_recipient(intended_email: str, intended_name: str) -> tuple[str, 
 def _get_brevo_api() -> sib_api_v3_sdk.TransactionalEmailsApi:
     api_key = os.environ.get("BREVO_API_KEY", "").strip()
     if not api_key:
+        logger.error(
+            "BREVO_API_KEY environment variable is not set – cannot send email. "
+            "On production this must be provided via the .env file next to manage.py "
+            "or the systemd unit's Environment/EnvironmentFile directive."
+        )
         raise RuntimeError("BREVO_API_KEY environment variable is not set")
+    # Log a safe fingerprint of the key (length + last 4 chars only) so you can
+    # confirm the *right* key is loaded without ever leaking it into the logs.
+    logger.debug(
+        "Brevo API key loaded (length=%d, ...%s)", len(api_key), api_key[-4:]
+    )
     config = sib_api_v3_sdk.Configuration()
     config.api_key["api-key"] = api_key
     return sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(config))
@@ -131,6 +141,25 @@ def send_email(
     RuntimeError   – BREVO_API_KEY is not configured
     ApiException   – Brevo API returned an error
     """
+    # --- log the effective configuration for this send -----------------------
+    live = _is_live()
+    logger.info(
+        "send_email() called | intended=%s | subject=%r | LIVE_EMAIL=%s | "
+        "BREVO_API_KEY set=%s | donation pk=%s",
+        recipient_email,
+        subject,
+        live,
+        bool(os.environ.get("BREVO_API_KEY", "").strip()),
+        getattr(donation, "pk", None),
+    )
+    if not live:
+        logger.warning(
+            "LIVE_EMAIL is not 'true' – this email will be REDIRECTED to the "
+            "override address (%s), not delivered to the real donor. Set "
+            "LIVE_EMAIL=true in the environment to send to real recipients.",
+            os.environ.get("LIVE_EMAIL_RECIPIENT_OVERRIDE", _DEFAULT_OVERRIDE).strip(),
+        )
+
     # --- eligibility check ---------------------------------------------------
     if donation is not None:
         eligible, reason = can_send_email(donation)
@@ -150,7 +179,7 @@ def send_email(
     final_email, final_name = _get_final_recipient(recipient_email, recipient_name)
 
     if not _is_live():
-        logger.debug(
+        logger.info(
             "Non-live mode: redirecting email intended for %s → %s",
             recipient_email,
             final_email,
