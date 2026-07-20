@@ -22,6 +22,9 @@ SENDER_NAME = "CFA"
 SENDER_EMAIL = "cfa@ramapo-dmc.dev"
 _DEFAULT_OVERRIDE = "tnosrati@ramapo.edu"
 
+# Address CC'd on every donation receipt (live mode only).
+RECEIPT_CC_EMAIL = "vpaulson@cfanj.org"
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -185,11 +188,20 @@ def send_email(
             final_email,
         )
 
+    # --- CC routing ----------------------------------------------------------
+    # CC a fixed monitoring address on every receipt, but only when sending for
+    # real – in non-live mode we don't want to email the real CC recipient.
+    cc = None
+    if _is_live() and RECEIPT_CC_EMAIL:
+        cc = [{"email": RECEIPT_CC_EMAIL}]
+        logger.info("CC'ing receipt to %s", RECEIPT_CC_EMAIL)
+
     # --- send ----------------------------------------------------------------
     api = _get_brevo_api()
     payload = sib_api_v3_sdk.SendSmtpEmail(
         sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
         to=[{"email": final_email, "name": final_name}],
+        cc=cc,
         subject=subject,
         html_content=html_content,
     )
