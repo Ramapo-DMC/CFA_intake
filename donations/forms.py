@@ -82,6 +82,7 @@ class DonationForm(forms.ModelForm):
         self.fields["other_donation"].required = False
         self.fields["total_weight"].required = False
         self.fields["opt_in_email"].required = False
+        self.fields["opt_in_email"].initial = True  # receipt enabled by default
         self.fields["opt_in_email"].label = "Send confirmation email to donor"
         self.fields["opt_in_email"].widget.attrs.pop("class", None)  # no form-control on checkbox
         self.fields["email"].widget.attrs["pattern"] = r"[^\s@]+@[^\s@]+\.[^\s@]{2,}"
