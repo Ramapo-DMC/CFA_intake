@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Load .env file if present (development convenience)
@@ -136,6 +138,25 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # SITE_BASE_URL                  – used to build unsubscribe links in emails
 #                                  (default: http://localhost:8000)
 # These are read at call-time by email_service.py; no Django email backend needed.
+
+# ---------------------------------------------------------------------------
+# In-kind donation valuation
+# ---------------------------------------------------------------------------
+# DONATION_VALUE_PER_POUND – dollar value assigned to each pound of donated
+#                            goods, used to estimate the value of in-kind
+#                            donations from their recorded weight.
+#                            Defaults to 3.90 if unset or unparseable.
+_raw_rate = os.environ.get("DONATION_VALUE_PER_POUND", "").strip()
+try:
+    DONATION_VALUE_PER_POUND = Decimal(_raw_rate) if _raw_rate else Decimal("3.90")
+except InvalidOperation:
+    # Don't take the site down over a typo in .env, but make it loud in the logs.
+    print(
+        f"WARNING: DONATION_VALUE_PER_POUND={_raw_rate!r} is not a valid number; "
+        "falling back to 3.90",
+        file=sys.stderr,
+    )
+    DONATION_VALUE_PER_POUND = Decimal("3.90")
 
 LOGIN_REDIRECT_URL = "donation-create"
 LOGOUT_REDIRECT_URL = "login"

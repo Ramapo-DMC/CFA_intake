@@ -106,7 +106,7 @@ def donation_export_csv(request):
     response['Content-Disposition'] = 'attachment; filename="donations.csv"'
     writer = csv.writer(response)
     writer.writerow([
-        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Notes"
+        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Donation Value ($)", "Notes"
     ])
     for d in donations:
         writer.writerow([
@@ -123,6 +123,7 @@ def donation_export_csv(request):
             d.gift_cards,
             d.other_donation,
             d.total_weight,
+            d.estimated_value,
             d.notes,
         ])
     return response
@@ -165,9 +166,9 @@ def donation_export_pdf(request):
 
     # Table header
     columns = [
-        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Notes"
+        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Donation Value ($)", "Notes"
     ]
-    col_widths = [1*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1.2*inch, 1*inch, 1.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch, 1.2*inch, 1*inch, 2*inch]
+    col_widths = [1*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1.2*inch, 1*inch, 1.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch, 1.2*inch, 1*inch, 1.1*inch, 2*inch]
     x = 0.5 * inch
     y = height - 0.75 * inch
     for i, col in enumerate(columns):
@@ -194,6 +195,7 @@ def donation_export_pdf(request):
             str(d.gift_cards) if d.gift_cards is not None else "-",
             d.other_donation,
             str(d.total_weight) if d.total_weight is not None else "-",
+            f"{d.estimated_value:,.2f}" if d.estimated_value is not None else "-",
             (d.notes[:60] + ("..." if d.notes and len(d.notes) > 60 else "")),
         ]
         for i, value in enumerate(row):
@@ -268,6 +270,15 @@ def donation_create(request):
                 gift = _format_gift_description(donation)
                 name = donation.donor_name or "Friend"
                 received_on = donation.donation_date.strftime("%B %d, %Y")
+                # Estimated value paragraph — only when a weight was recorded.
+                value_paragraph = ""
+                if donation.estimated_value is not None:
+                    value_paragraph = (
+                        '<p>Based on the recorded weight of '
+                        f'<strong>{donation.total_weight:,.2f} lbs</strong>, the estimated '
+                        'value of your donation is '
+                        f'<strong>${donation.estimated_value:,.2f}</strong>.</p>\n\n  '
+                    )
                 html_body = f"""
 <div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;
             margin:0 auto;color:#222;line-height:1.75;font-size:15px;">
@@ -279,7 +290,7 @@ def donation_create(request):
   facing food insecurity in Bergen and Passaic counties have access to
   nutritious food and essential resources.</p>
 
-  <p>Your generosity makes this work possible. We are deeply grateful for your
+  {value_paragraph}<p>Your generosity makes this work possible. We are deeply grateful for your
   belief in our mission and your partnership in creating a stronger, more caring
   community. Thank you for making a meaningful difference.</p>
 

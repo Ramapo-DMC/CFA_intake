@@ -1,3 +1,6 @@
+from decimal import Decimal, ROUND_HALF_UP
+
+from django.conf import settings
 from django.db import models, transaction
 
 
@@ -46,6 +49,20 @@ class Donation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.donor_name} ({self.donation_date})"
+
+    @property
+    def estimated_value(self):
+        """
+        Estimated dollar value of the donated goods, derived from total_weight
+        at the DONATION_VALUE_PER_POUND rate. Computed on read rather than
+        stored, so a rate change applies everywhere at once.
+
+        Returns None when no weight was recorded.
+        """
+        if self.total_weight is None:
+            return None
+        rate = Decimal(settings.DONATION_VALUE_PER_POUND)
+        return (self.total_weight * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class DonationCounter(models.Model):
