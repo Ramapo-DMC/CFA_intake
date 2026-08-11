@@ -19,9 +19,10 @@ class DonationForm(forms.ModelForm):
         cash_check = cleaned_data.get("cash_check")
         gift_cards = cleaned_data.get("gift_cards")
         other_donation = cleaned_data.get("other_donation")
-        if not (num_bags or num_boxes or cash_check or gift_cards or (other_donation and other_donation.strip())):
+        total_weight = cleaned_data.get("total_weight")
+        if not (num_bags or num_boxes or cash_check or gift_cards or total_weight or (other_donation and other_donation.strip())):
             raise forms.ValidationError(
-                "At least one of the following fields must be filled: # of Bags, # of Boxes, Cash/Check $, Gift Cards $, Other Donation."
+                "At least one of the following fields must be filled: # of Bags, # of Boxes, Cash/Check $, Gift Cards $, Other Donation, Total Weight (lbs)."
             )
         return cleaned_data
     donor_type = forms.ChoiceField(
