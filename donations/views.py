@@ -1,6 +1,7 @@
 
 import csv
 import logging
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -43,6 +44,7 @@ def donation_detail(request, pk):
     return render(request, "donations/donation_detail.html", {
         "donation": donation,
         "donor_type_choices": Donation.DONOR_TYPE_CHOICES,
+        "value_per_pound": settings.DONATION_VALUE_PER_POUND,
     })
 
 @login_required
@@ -61,8 +63,11 @@ def donation_edit(request, pk):
     if request.method == "POST":
         form = DonationForm(request.POST, instance=donation)
         if form.is_valid():
-            form.save()
-            return JsonResponse({"success": True})
+            donation = form.save()
+            return JsonResponse({
+                "success": True,
+                "estimated_value": donation.estimated_value,
+            })
         return JsonResponse({"success": False, "errors": form.errors}, status=400)
     return JsonResponse({"success": False}, status=405)
 
