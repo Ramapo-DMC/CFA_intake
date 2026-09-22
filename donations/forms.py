@@ -86,8 +86,13 @@ class DonationForm(forms.ModelForm):
         self.fields["opt_in_email"].initial = True  # receipt enabled by default
         self.fields["opt_in_email"].label = "Send confirmation email to donor"
         self.fields["opt_in_email"].widget.attrs.pop("class", None)  # no form-control on checkbox
-        self.fields["email"].widget.attrs["pattern"] = r"[^\s@]+@[^\s@]+\.[^\s@]{2,}"
-        self.fields["email"].widget.attrs["title"] = "e.g. name@example.com"
+        # Deliberately permissive: any local part, any domain, any TLD
+        # (.org, .net, .edu, .co.uk, …). All it requires is name@domain.tld.
+        # Django's EmailField is the authoritative check on the server.
+        self.fields["email"].widget.attrs["pattern"] = r"[^\s@]+@[^\s@]+\.[^\s@.]{2,}"
+        self.fields["email"].widget.attrs["title"] = (
+            "A full email address, e.g. info@example.org"
+        )
         self.fields["phone_number"].validators.append(_phone_validator)
         self.fields["phone_number"].widget.attrs["type"] = "tel"
         self.fields["phone_number"].widget.attrs["pattern"] = r"[\+\d][\d\s()\-\.]{6,19}"

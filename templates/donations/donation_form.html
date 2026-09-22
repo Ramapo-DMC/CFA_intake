@@ -630,9 +630,14 @@
 
   /* ── Validation helpers ───────────────────────────── */
   const PHONE_RE  = /^\+?[\d\s()\-\.]{7,20}$/;
-  const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  // Any local part, any domain, any TLD — .org, .net, .edu, .co.uk all pass.
+  // The only shape required is name@domain.tld.
+  const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/;
   const PHONE_MSG = "Enter a valid phone number (e.g. 555-123-4567).";
-  const EMAIL_MSG = "Enter a valid email address (e.g. name@example.com).";
+  const EMAIL_MSG = "Enter a valid email address (e.g. info@example.org).";
+  const EMAIL_NO_AT_MSG =
+    "An email address needs an @ — e.g. info@example.org. " +
+    "A website or domain on its own can't receive a receipt.";
 
   // Empty = OK (field is optional). Non-empty must match regex.
   // Shows error text above the input; clears it when valid.
@@ -641,6 +646,16 @@
     const ok  = !val || regex.test(val);
     input.classList.toggle("wz-error", !ok);
     errEl.textContent = ok ? "" : msg;
+    return ok;
+  }
+
+  // Same contract as checkOptional, but the message names the actual problem
+  // instead of showing one example address staff read as the only allowed form.
+  function checkEmail(input) {
+    const val = input.value.trim();
+    const ok  = !val || EMAIL_RE.test(val);
+    input.classList.toggle("wz-error", !ok);
+    errEmail.textContent = ok ? "" : (val.includes("@") ? EMAIL_MSG : EMAIL_NO_AT_MSG);
     return ok;
   }
 
@@ -653,7 +668,7 @@
     if (!dateOk) valid = false;
 
     if (cgContact.classList.contains("open")) {
-      if (!checkOptional(emailInput, EMAIL_RE, errEmail, EMAIL_MSG)) valid = false;
+      if (!checkEmail(emailInput)) valid = false;
       if (!checkOptional(phoneInput, PHONE_RE, errPhone, PHONE_MSG)) valid = false;
     }
 
@@ -677,7 +692,7 @@
 
   // Email: live regex validation
   emailInput.addEventListener("input", (e) => {
-    checkOptional(e.target, EMAIL_RE, errEmail, EMAIL_MSG);
+    checkEmail(e.target);
   });
 })();
 
