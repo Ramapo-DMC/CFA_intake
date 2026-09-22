@@ -409,11 +409,11 @@
                 <th>Items</th>
                 <th>Bags</th>
                 <th>Boxes</th>
-                <th>Weight (lbs)</th>
-                <th>Cash/Check</th>
-                <th>Gift Cards</th>
+                <th>Wt (lbs)</th>
+                <th>Cash $</th>
+                <th>Gift $</th>
+                <th>Value $</th>
                 <th>Other</th>
-                <th>Est. Value</th>
                 <th>Organization</th>
                 <th>Email</th>
                 <th>Phone</th>
@@ -437,8 +437,8 @@
                 <td>{{ donation.total_weight|default:"—" }}</td>
                 <td>{{ donation.cash_check|default:"—" }}</td>
                 <td>{{ donation.gift_cards|default:"—" }}</td>
+                <td style="white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;">{% if donation.estimated_value is not None %}{{ donation.estimated_value|floatformat:2 }}{% else %}—{% endif %}</td>
                 <td>{{ donation.other_donation|default:"—" }}</td>
-                <td style="white-space:nowrap;font-variant-numeric:tabular-nums;">{% if donation.estimated_value is not None %}${{ donation.estimated_value|floatformat:2 }}{% else %}—{% endif %}</td>
                 <td>{{ donation.organization|default:"—" }}</td>
                 <td><span class="cell-trunc">{{ donation.email|default:"—" }}</span></td>
                 <td style="white-space:nowrap;">{{ donation.phone_number|default:"—" }}</td>
