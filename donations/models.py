@@ -3,6 +3,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.db import models, transaction
 
+from . import catalog
+
 
 class Site(models.Model):
     name = models.CharField(max_length=120, unique=True)
@@ -63,6 +65,46 @@ class Donation(models.Model):
             return None
         rate = Decimal(settings.DONATION_VALUE_PER_POUND)
         return (self.total_weight * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+class DonationItem(models.Model):
+    """
+    One priced line on a donation: a category from catalog.py and a quantity.
+
+    Only catalog categories are stored here. General Food/Goods, cash, gift
+    cards and Other stay in the Donation's own columns -- each can occur at
+    most once per donation, so a child row would buy nothing and would mean
+    migrating every historical donation into this table.
+    """
+    donation = models.ForeignKey(Donation, on_delete=models.CASCADE, related_name="items")
+    category = models.CharField(max_length=32, choices=catalog.CATEGORY_CHOICES)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return self.describe()
+
+    @property
+    def unit_price(self):
+        """Current catalog price, or None if the category is no longer listed."""
+        return catalog.price_for(self.category)
+
+    @property
+    def value(self):
+        """
+        quantity x current unit price, or None when the category has been
+        dropped from the catalog. None rather than 0 so a retired category
+        reads as "unknown" in the exports instead of silently worth nothing.
+        """
+        price = self.unit_price
+        if price is None:
+            return None
+        return (self.quantity * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def describe(self) -> str:
+        return catalog.describe(self.category, self.quantity)
 
 
 class DonationCounter(models.Model):
