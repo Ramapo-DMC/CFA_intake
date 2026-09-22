@@ -33,6 +33,28 @@ def _catalog_for_js():
     }
 
 
+def _format_items(donation) -> str:
+    """Semicolon-separated line items for a single export cell."""
+    return "; ".join(item.describe() for item in donation.items.all())
+
+
+def _fit(canvas_obj, text, width, font, size):
+    """
+    Truncate text with an ellipsis until it fits within width.
+
+    The table is 16 columns on a landscape letter page, so nearly every cell
+    has to be clipped; without this the columns overrun each other and the
+    page edge.
+    """
+    text = text or "-"
+    if canvas_obj.stringWidth(text, font, size) <= width:
+        return text
+    ellipsis = "\u2026"
+    while text and canvas_obj.stringWidth(text + ellipsis, font, size) > width:
+        text = text[:-1]
+    return text + ellipsis
+
+
 def _format_gift_description(donation) -> str:
     """Build a human-readable summary of what was donated."""
     parts = []
@@ -40,6 +62,8 @@ def _format_gift_description(donation) -> str:
         parts.append(f"${donation.cash_check:,.2f} cash/check")
     if donation.gift_cards:
         parts.append(f"${donation.gift_cards:,.2f} in gift cards")
+    for item in donation.items.all():
+        parts.append(item.describe())
     if donation.num_bags:
         n = donation.num_bags
         parts.append(f"{n} bag{'s' if n != 1 else ''}")
@@ -130,7 +154,7 @@ def donation_export_csv(request):
     response['Content-Disposition'] = 'attachment; filename="donations.csv"'
     writer = csv.writer(response)
     writer.writerow([
-        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Donation Value ($)", "Notes"
+        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Items", "Total Weight (lbs)", "Donation Value ($)", "Notes"
     ])
     for d in donations:
         writer.writerow([
@@ -146,6 +170,7 @@ def donation_export_csv(request):
             d.cash_check,
             d.gift_cards,
             d.other_donation,
+            _format_items(d),
             d.total_weight,
             d.estimated_value,
             d.notes,
@@ -188,21 +213,35 @@ def donation_export_pdf(request):
     c = canvas.Canvas(response, pagesize=landscape(letter))
     width, height = landscape(letter)
 
-    # Table header
+    # Table header. The widths below total exactly 10 inches, the printable
+    # width of a landscape letter page inside its half-inch margins -- the
+    # previous set totalled 16.8 inches and ran off the edge of the paper.
     columns = [
-        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "# of Bags", "# of Boxes", "Cash/Check $", "Gift Cards $", "Other Donation", "Total Weight (lbs)", "Donation Value ($)", "Notes"
+        "Date", "Site", "Donor", "Type", "Email", "Phone", "Address", "Bags",
+        "Boxes", "Cash $", "Gift $", "Other", "Items", "Wt (lbs)", "Value $", "Notes",
     ]
-    col_widths = [1*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1.2*inch, 1*inch, 1.5*inch, 0.8*inch, 0.8*inch, 1*inch, 1*inch, 1.2*inch, 1*inch, 1.1*inch, 2*inch]
+    col_widths = [
+        0.62*inch, 0.75*inch, 0.85*inch, 0.50*inch, 1.00*inch, 0.68*inch,
+        0.85*inch, 0.30*inch, 0.32*inch, 0.42*inch, 0.38*inch, 0.63*inch,
+        1.15*inch, 0.45*inch, 0.50*inch, 0.60*inch,
+    ]
+    header_font, header_size = "Helvetica-Bold", 6.5
+    row_font, row_size = "Helvetica", 6.5
+
+    def draw_header(y_pos):
+        c.setFont(header_font, header_size)
+        x_pos = 0.5 * inch
+        for i, col in enumerate(columns):
+            c.drawString(x_pos, y_pos, _fit(c, col, col_widths[i] - 3, header_font, header_size))
+            x_pos += col_widths[i]
+
     x = 0.5 * inch
     y = height - 0.75 * inch
-    for i, col in enumerate(columns):
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(x, y, col)
-        x += col_widths[i]
+    draw_header(y)
 
     # Table rows
     y -= 0.3 * inch
-    c.setFont("Helvetica", 10)
+    c.setFont(row_font, row_size)
     for d in donations:
         x = 0.5 * inch
         row = [
@@ -218,24 +257,22 @@ def donation_export_pdf(request):
             str(d.cash_check) if d.cash_check is not None else "-",
             str(d.gift_cards) if d.gift_cards is not None else "-",
             d.other_donation,
+            _format_items(d),
             str(d.total_weight) if d.total_weight is not None else "-",
             f"{d.estimated_value:,.2f}" if d.estimated_value is not None else "-",
-            (d.notes[:60] + ("..." if d.notes and len(d.notes) > 60 else "")),
+            d.notes,
         ]
         for i, value in enumerate(row):
-            c.drawString(x, y, value if value else "-")
+            # Leave 3pt of gutter so adjacent cells never touch.
+            c.drawString(x, y, _fit(c, value, col_widths[i] - 3, row_font, row_size))
             x += col_widths[i]
         y -= 0.25 * inch
         if y < 0.75 * inch:
             c.showPage()
             y = height - 0.75 * inch
-            c.setFont("Helvetica-Bold", 11)
-            x = 0.5 * inch
-            for i, col in enumerate(columns):
-                c.drawString(x, y, col)
-                x += col_widths[i]
+            draw_header(y)
             y -= 0.3 * inch
-            c.setFont("Helvetica", 10)
+            c.setFont(row_font, row_size)
 
     c.save()
     return response
@@ -295,12 +332,22 @@ def donation_create(request):
                 gift = _format_gift_description(donation)
                 name = donation.donor_name or "Friend"
                 received_on = donation.donation_date.strftime("%B %d, %Y")
-                # Estimated value paragraph — only when a weight was recorded.
+                # Estimated value paragraph — only when there is something to
+                # value. Names what the estimate was based on, since it can now
+                # come from priced items, loose weight, or both.
                 value_paragraph = ""
                 if donation.estimated_value is not None:
+                    if donation.items_value is not None and donation.general_goods_value is not None:
+                        basis = "the items and weight recorded"
+                    elif donation.items_value is not None:
+                        basis = "the items recorded"
+                    else:
+                        basis = (
+                            "the recorded weight of "
+                            f"<strong>{donation.total_weight:,.2f} lbs</strong>"
+                        )
                     value_paragraph = (
-                        '<p>Based on the recorded weight of '
-                        f'<strong>{donation.total_weight:,.2f} lbs</strong>, the estimated '
+                        f'<p>Based on {basis}, the estimated '
                         'value of your donation is '
                         f'<strong>${donation.estimated_value:,.2f}</strong>.</p>\n\n  '
                     )
