@@ -1342,8 +1342,10 @@
   document.getElementById("wz-form").addEventListener("submit", (e) => {
     if (readLines().length === 0) {
       e.preventDefault();
-      errBox.textContent = "Add at least one thing donated before saving.";
+      // selectKind clears the error box, so open the panel first and put the
+      // message up afterwards -- otherwise the save is blocked silently.
       if (!activeKind) selectKind("goods");
+      errBox.textContent = "Add at least one thing donated before saving.";
     }
   });
 
