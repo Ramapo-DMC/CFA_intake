@@ -53,18 +53,48 @@ class Donation(models.Model):
         return f"{self.donor_name} ({self.donation_date})"
 
     @property
-    def estimated_value(self):
+    def general_goods_value(self):
         """
-        Estimated dollar value of the donated goods, derived from total_weight
-        at the DONATION_VALUE_PER_POUND rate. Computed on read rather than
-        stored, so a rate change applies everywhere at once.
-
-        Returns None when no weight was recorded.
+        Value of loose General Food/Goods, from total_weight at the
+        DONATION_VALUE_PER_POUND rate. None when no weight was recorded.
         """
         if self.total_weight is None:
             return None
         rate = Decimal(settings.DONATION_VALUE_PER_POUND)
         return (self.total_weight * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def items_value(self):
+        """
+        Value of the priced line items, or None when there are none.
+
+        Items whose category is no longer in the catalog have no price and
+        contribute nothing here, while still showing as unknown on their own
+        line. That only happens if a category is deleted from catalog.py --
+        retiring one by leaving it in place keeps historical donations valued.
+        """
+        values = [item.value for item in self.items.all() if item.value is not None]
+        if not values:
+            return None
+        return sum(values)
+
+    @property
+    def estimated_value(self):
+        """
+        Estimated dollar value of the donated goods: priced line items plus
+        loose General Food/Goods by weight. Computed on read rather than
+        stored, so a price change applies everywhere at once.
+
+        Cash and gift cards are excluded. They are money already, not an
+        estimate, and the receipt reports them separately.
+
+        Returns None when the donation has neither items nor a weight, which
+        is what every donation recorded before line items existed looks like.
+        """
+        parts = [v for v in (self.items_value, self.general_goods_value) if v is not None]
+        if not parts:
+            return None
+        return sum(parts)
 
 
 class DonationItem(models.Model):
