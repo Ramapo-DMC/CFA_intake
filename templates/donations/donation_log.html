@@ -229,6 +229,8 @@
 .det-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.25rem; }
 .det-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 1rem; }
 .det-field { margin-bottom: 1rem; }
+.cell-items { display: inline-block; min-width: 165px; max-width: 260px;
+              white-space: normal; line-height: 1.35; }
 /* ── Donation line items ──────────────────────────────── */
 .det-span-3 { grid-column: 1 / -1; }
 .det-item-row {
@@ -404,17 +406,18 @@
                 <th>Site</th>
                 <th>Donor</th>
                 <th>Type</th>
+                <th>Items</th>
+                <th>Bags</th>
+                <th>Boxes</th>
+                <th>Weight (lbs)</th>
+                <th>Cash/Check</th>
+                <th>Gift Cards</th>
+                <th>Other</th>
+                <th>Est. Value</th>
                 <th>Organization</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Address</th>
-                <th>Bags</th>
-                <th>Boxes</th>
-                <th>Cash/Check</th>
-                <th>Gift Cards</th>
-                <th>Other</th>
-                <th>Items</th>
-                <th>Weight (lbs)</th>
                 <th>Notes</th>
             </tr>
         </thead>
@@ -428,21 +431,22 @@
                 <td>
                     <span class="type-badge type-{{ donation.donor_type|lower }}">{{ donation.donor_type }}</span>
                 </td>
+                <td><span class="cell-items">{% for item in donation.items.all %}{{ item.describe }}{% if not forloop.last %}; {% endif %}{% empty %}—{% endfor %}</span></td>
+                <td>{{ donation.num_bags|default:"—" }}</td>
+                <td>{{ donation.num_boxes|default:"—" }}</td>
+                <td>{{ donation.total_weight|default:"—" }}</td>
+                <td>{{ donation.cash_check|default:"—" }}</td>
+                <td>{{ donation.gift_cards|default:"—" }}</td>
+                <td>{{ donation.other_donation|default:"—" }}</td>
+                <td style="white-space:nowrap;font-variant-numeric:tabular-nums;">{% if donation.estimated_value is not None %}${{ donation.estimated_value|floatformat:2 }}{% else %}—{% endif %}</td>
                 <td>{{ donation.organization|default:"—" }}</td>
                 <td><span class="cell-trunc">{{ donation.email|default:"—" }}</span></td>
                 <td style="white-space:nowrap;">{{ donation.phone_number|default:"—" }}</td>
                 <td><span class="cell-trunc">{{ donation.address|default:"—" }}</span></td>
-                <td>{{ donation.num_bags|default:"—" }}</td>
-                <td>{{ donation.num_boxes|default:"—" }}</td>
-                <td>{{ donation.cash_check|default:"—" }}</td>
-                <td>{{ donation.gift_cards|default:"—" }}</td>
-                <td>{{ donation.other_donation|default:"—" }}</td>
-                <td><span class="cell-trunc">{% for item in donation.items.all %}{{ item.describe }}{% if not forloop.last %}; {% endif %}{% empty %}—{% endfor %}</span></td>
-                <td>{{ donation.total_weight|default:"—" }}</td>
                 <td><span class="cell-trunc cell-muted">{{ donation.notes|default:"" }}</span></td>
             </tr>
         {% empty %}
-            <tr><td colspan="17" style="text-align:center; padding:2rem; color:var(--muted);">No donations found.</td></tr>
+            <tr><td colspan="18" style="text-align:center; padding:2rem; color:var(--muted);">No donations found.</td></tr>
         {% endfor %}
         </tbody>
     </table>
