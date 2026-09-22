@@ -229,6 +229,35 @@
 .det-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.25rem; }
 .det-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 1rem; }
 .det-field { margin-bottom: 1rem; }
+/* ── Donation line items ──────────────────────────────── */
+.det-span-3 { grid-column: 1 / -1; }
+.det-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #fff;
+}
+.det-item-label { flex: 1 1 auto; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.det-item-qty { flex: 0 0 90px; }
+.det-item-unit { flex: 0 0 auto; font-size: 0.8rem; color: var(--muted); min-width: 56px; }
+.det-item-remove {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff; color: var(--muted);
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+}
+.det-item-remove:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.det-item-add { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.det-item-add select { flex: 1 1 auto; }
+.det-item-add input { flex: 0 0 90px; }
+
+
 .det-span-2 { grid-column: span 2; }
 .det-span-3 { grid-column: span 3; }
 .det-field label {
@@ -384,6 +413,7 @@
                 <th>Cash/Check</th>
                 <th>Gift Cards</th>
                 <th>Other</th>
+                <th>Items</th>
                 <th>Weight (lbs)</th>
                 <th>Notes</th>
             </tr>
@@ -407,11 +437,12 @@
                 <td>{{ donation.cash_check|default:"—" }}</td>
                 <td>{{ donation.gift_cards|default:"—" }}</td>
                 <td>{{ donation.other_donation|default:"—" }}</td>
+                <td><span class="cell-trunc">{% for item in donation.items.all %}{{ item.describe }}{% if not forloop.last %}; {% endif %}{% empty %}—{% endfor %}</span></td>
                 <td>{{ donation.total_weight|default:"—" }}</td>
                 <td><span class="cell-trunc cell-muted">{{ donation.notes|default:"" }}</span></td>
             </tr>
         {% empty %}
-            <tr><td colspan="16" style="text-align:center; padding:2rem; color:var(--muted);">No donations found.</td></tr>
+            <tr><td colspan="17" style="text-align:center; padding:2rem; color:var(--muted);">No donations found.</td></tr>
         {% endfor %}
         </tbody>
     </table>

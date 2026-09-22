@@ -54,20 +54,24 @@ def _format_gift_description(donation) -> str:
 
 @login_required
 def donation_detail(request, pk):
-    donation = get_object_or_404(Donation, pk=pk)
+    donation = get_object_or_404(Donation.objects.prefetch_related("items"), pk=pk)
     return render(request, "donations/donation_detail.html", {
         "donation": donation,
         "donor_type_choices": Donation.DONOR_TYPE_CHOICES,
         "value_per_pound": settings.DONATION_VALUE_PER_POUND,
+        "category_choices": catalog.CATEGORY_CHOICES,
+        "catalog_json": _catalog_for_js(),
     })
 
 @login_required
 def donation_preview_modal(request, pk):
-    donation = get_object_or_404(Donation, pk=pk)
+    donation = get_object_or_404(Donation.objects.prefetch_related("items"), pk=pk)
     donor_type_choices = Donation.DONOR_TYPE_CHOICES
     return render(request, "donations/donation_preview_modal.html", {
         "donation": donation,
         "donor_type_choices": donor_type_choices,
+        "category_choices": catalog.CATEGORY_CHOICES,
+        "catalog_json": _catalog_for_js(),
     })
 
 
@@ -78,6 +82,7 @@ def donation_edit(request, pk):
         form = DonationForm(request.POST, instance=donation)
         if form.is_valid():
             donation = form.save()
+            form.save_items(donation)
             return JsonResponse({
                 "success": True,
                 "estimated_value": donation.estimated_value,
@@ -103,7 +108,7 @@ def donation_export_csv(request):
     date_from = request.GET.get("date_from", "").strip()
     date_to = request.GET.get("date_to", "").strip()
 
-    donations = Donation.objects.select_related("site").all()
+    donations = Donation.objects.select_related("site").prefetch_related("items").all()
     if query:
         donations = donations.filter(
             Q(donor_name__icontains=query)
@@ -158,7 +163,7 @@ def donation_export_pdf(request):
     date_from = request.GET.get("date_from", "").strip()
     date_to = request.GET.get("date_to", "").strip()
 
-    donations = Donation.objects.select_related("site").all()
+    donations = Donation.objects.select_related("site").prefetch_related("items").all()
     if query:
         donations = donations.filter(
             Q(donor_name__icontains=query)
@@ -389,7 +394,7 @@ def donation_log(request):
     date_from = request.GET.get("date_from", "").strip()
     date_to = request.GET.get("date_to", "").strip()
 
-    donations = Donation.objects.select_related("site").all()
+    donations = Donation.objects.select_related("site").prefetch_related("items").all()
     if query:
         donations = donations.filter(
             Q(donor_name__icontains=query)

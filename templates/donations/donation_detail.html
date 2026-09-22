@@ -122,6 +122,34 @@
   min-height: 80px;
 }
 
+/* ── Donation line items ──────────────────────────────── */
+.det-span-3 { grid-column: 1 / -1; }
+.det-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #fff;
+}
+.det-item-label { flex: 1 1 auto; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.det-item-qty { flex: 0 0 90px; }
+.det-item-unit { flex: 0 0 auto; font-size: 0.8rem; color: var(--muted); min-width: 56px; }
+.det-item-remove {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff; color: var(--muted);
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
+}
+.det-item-remove:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+.det-item-add { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.det-item-add select { flex: 1 1 auto; }
+.det-item-add input { flex: 0 0 90px; }
+
 .det-error {
   margin: 0 1.75rem 0.75rem;
   background: #fdf2f2;
@@ -255,10 +283,36 @@
             <label>Total Weight (lbs)</label>
             <input type="number" step="0.01" min="0" name="total_weight" value="{{ donation.total_weight }}" class="form-control" />
           </div>
+          <div class="det-field det-span-3">
+            <label>Items</label>
+            <div id="det-items">
+              {% for item in donation.items.all %}
+              <div class="det-item-row">
+                <input type="hidden" name="item_category" value="{{ item.category }}">
+                <span class="det-item-label">{{ item.get_category_display }}</span>
+                <input type="number" step="0.01" min="0" name="item_quantity"
+                       value="{{ item.quantity|floatformat:'-2' }}" class="form-control det-item-qty">
+                <span class="det-item-unit">{{ item.unit }}</span>
+                <button type="button" class="det-item-remove" aria-label="Remove item">&times;</button>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="det-item-add">
+              <select id="det-item-cat" class="form-control">
+                <option value="">Add an item…</option>
+                {% for key, label in category_choices %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              <input type="number" step="0.01" min="0" id="det-item-qty" class="form-control"
+                     placeholder="Qty" disabled>
+              <button type="button" class="det-btn det-btn-secondary" id="det-item-add-btn" disabled>Add</button>
+            </div>
+          </div>
           <div class="det-field">
             <label>Estimated Value ($)</label>
             <input type="text" id="estimated-value" class="form-control" readonly
-                   title="Calculated from Total Weight at ${{ value_per_pound }} per pound."
+                   title="Priced items plus Total Weight at ${{ value_per_pound }} per pound. Cash and gift cards are not included."
                    value="{{ donation.estimated_value|default_if_none:'—' }}" />
           </div>
         </div>
@@ -282,6 +336,8 @@
   </div>
 </div>
 
+{{ catalog_json|json_script:"det-catalog" }}
+
 <script>
 (function () {
     function getCsrf() {
@@ -297,11 +353,75 @@
         valueField.value = (v === null || v === undefined || v === '') ? '\u2014' : v;
     }
 
-    // Live preview while typing; the server's value wins on save.
-    weightInput.addEventListener('input', function () {
-        const w = parseFloat(weightInput.value.trim());
-        showValue(isNaN(w) ? null : (w * VALUE_PER_POUND).toFixed(2));
+    /* ── Line item add / remove ─────────────────────────────
+       Rows live inside the form, so FormData picks up their
+       item_category / item_quantity pairs with no extra work. The
+       hidden category always precedes its quantity in document order,
+       which is what pairs them up server-side. */
+    const CATALOG = JSON.parse(document.getElementById('det-catalog').textContent);
+    const itemsBox  = document.getElementById('det-items');
+    const itemCat   = document.getElementById('det-item-cat');
+    const itemQty   = document.getElementById('det-item-qty');
+    const itemAdd   = document.getElementById('det-item-add-btn');
+
+    function syncAddRow() {
+        const on = !!itemCat.value;
+        itemQty.disabled = !on;
+        itemAdd.disabled = !on;
+        itemQty.placeholder = on ? (CATALOG[itemCat.value].unit) : 'Qty';
+    }
+    itemCat.addEventListener('change', syncAddRow);
+    syncAddRow();
+
+    itemAdd.addEventListener('click', function () {
+        const key = itemCat.value;
+        const q = parseFloat(itemQty.value);
+        if (!key || isNaN(q) || q <= 0) return;
+        const entry = CATALOG[key];
+
+        const row = document.createElement('div');
+        row.className = 'det-item-row';
+        row.innerHTML =
+            '<input type="hidden" name="item_category">' +
+            '<span class="det-item-label"></span>' +
+            '<input type="number" step="0.01" min="0" name="item_quantity" class="form-control det-item-qty">' +
+            '<span class="det-item-unit"></span>' +
+            '<button type="button" class="det-item-remove" aria-label="Remove item">&times;</button>';
+        row.querySelector('[name=item_category]').value = key;
+        row.querySelector('.det-item-label').textContent = entry.label;
+        row.querySelector('[name=item_quantity]').value = String(q);
+        row.querySelector('.det-item-unit').textContent = entry.unit;
+        itemsBox.appendChild(row);
+
+        itemCat.value = ''; itemQty.value = ''; syncAddRow();
+        recalc();
     });
+
+    itemsBox.addEventListener('click', function (e) {
+        const btn = e.target.closest('.det-item-remove');
+        if (!btn) return;
+        btn.closest('.det-item-row').remove();
+        recalc();
+    });
+    itemsBox.addEventListener('input', function (e) {
+        if (e.target.name === 'item_quantity') { recalc(); }
+    });
+
+    // Live preview while typing; the server's value wins on save.
+    // Mirrors Donation.estimated_value: priced items plus loose weight,
+    // with cash and gift cards deliberately excluded.
+    function recalc() {
+        let total = 0;
+        const w = parseFloat(weightInput.value.trim());
+        if (!isNaN(w)) total += w * VALUE_PER_POUND;
+        itemsBox.querySelectorAll('.det-item-row').forEach(function (row) {
+            const entry = CATALOG[row.querySelector('[name=item_category]').value];
+            const q = parseFloat(row.querySelector('[name=item_quantity]').value);
+            if (entry && !isNaN(q)) total += q * entry.price;
+        });
+        showValue(total > 0 ? total.toFixed(2) : null);
+    }
+    weightInput.addEventListener('input', recalc);
 
     document.getElementById('save-donation-btn').onclick = function () {
         const form = document.getElementById('donation-detail-form');

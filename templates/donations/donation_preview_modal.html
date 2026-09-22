@@ -73,6 +73,32 @@
           <label>Total Weight (lbs)</label>
           <input type="number" step="0.01" min="0" name="total_weight" value="{{ donation.total_weight }}" class="form-control" />
         </div>
+        <div class="det-field det-span-3">
+          <label>Items</label>
+          <div id="det-items">
+            {% for item in donation.items.all %}
+            <div class="det-item-row">
+              <input type="hidden" name="item_category" value="{{ item.category }}">
+              <span class="det-item-label">{{ item.get_category_display }}</span>
+              <input type="number" step="0.01" min="0" name="item_quantity"
+                     value="{{ item.quantity|floatformat:'-2' }}" class="form-control det-item-qty">
+              <span class="det-item-unit">{{ item.unit }}</span>
+              <button type="button" class="det-item-remove" aria-label="Remove item">&times;</button>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="det-item-add">
+            <select id="det-item-cat" class="form-control">
+              <option value="">Add an item…</option>
+              {% for key, label in category_choices %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="number" step="0.01" min="0" id="det-item-qty" class="form-control"
+                   placeholder="Qty" disabled>
+            <button type="button" class="det-btn det-btn-secondary" id="det-item-add-btn" disabled>Add</button>
+          </div>
+        </div>
       </div>
       <div class="det-field">
         <label>Notes</label>
@@ -93,8 +119,64 @@
   </div>
 </div>
 
+{{ catalog_json|json_script:"prev-catalog" }}
+
 <script>
 (function () {
+    /* ── Line item add / remove ─────────────────────────────
+       Rows live inside the form, so FormData picks up their
+       item_category / item_quantity pairs with no extra work. The
+       hidden category always precedes its quantity in document order,
+       which is what pairs them up server-side. */
+    const CATALOG = JSON.parse(document.getElementById('prev-catalog').textContent);
+    const itemsBox  = document.getElementById('det-items');
+    const itemCat   = document.getElementById('det-item-cat');
+    const itemQty   = document.getElementById('det-item-qty');
+    const itemAdd   = document.getElementById('det-item-add-btn');
+
+    function syncAddRow() {
+        const on = !!itemCat.value;
+        itemQty.disabled = !on;
+        itemAdd.disabled = !on;
+        itemQty.placeholder = on ? (CATALOG[itemCat.value].unit) : 'Qty';
+    }
+    itemCat.addEventListener('change', syncAddRow);
+    syncAddRow();
+
+    itemAdd.addEventListener('click', function () {
+        const key = itemCat.value;
+        const q = parseFloat(itemQty.value);
+        if (!key || isNaN(q) || q <= 0) return;
+        const entry = CATALOG[key];
+
+        const row = document.createElement('div');
+        row.className = 'det-item-row';
+        row.innerHTML =
+            '<input type="hidden" name="item_category">' +
+            '<span class="det-item-label"></span>' +
+            '<input type="number" step="0.01" min="0" name="item_quantity" class="form-control det-item-qty">' +
+            '<span class="det-item-unit"></span>' +
+            '<button type="button" class="det-item-remove" aria-label="Remove item">&times;</button>';
+        row.querySelector('[name=item_category]').value = key;
+        row.querySelector('.det-item-label').textContent = entry.label;
+        row.querySelector('[name=item_quantity]').value = String(q);
+        row.querySelector('.det-item-unit').textContent = entry.unit;
+        itemsBox.appendChild(row);
+
+        itemCat.value = ''; itemQty.value = ''; syncAddRow();
+        
+    });
+
+    itemsBox.addEventListener('click', function (e) {
+        const btn = e.target.closest('.det-item-remove');
+        if (!btn) return;
+        btn.closest('.det-item-row').remove();
+        
+    });
+    itemsBox.addEventListener('input', function (e) {
+        if (e.target.name === 'item_quantity') {  }
+    });
+
     function getCsrf() {
         const el = document.querySelector('#donation-edit-form [name=csrfmiddlewaretoken]');
         return el ? el.value : '';

@@ -117,6 +117,11 @@ class DonationItem(models.Model):
         return self.describe()
 
     @property
+    def unit(self):
+        """Unit noun for this category ("pack", "pound"), for templates."""
+        return catalog.unit_for(self.category)
+
+    @property
     def unit_price(self):
         """Current catalog price, or None if the category is no longer listed."""
         return catalog.price_for(self.category)
