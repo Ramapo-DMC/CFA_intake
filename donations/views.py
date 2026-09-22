@@ -11,12 +11,26 @@ from datetime import date, timedelta
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from . import catalog
 from .models import Donation, Site
 from .forms import DonationForm
 from .site_select_form import SiteSelectForm
 from .email_service import send_email
 
 logger = logging.getLogger(__name__)
+
+
+def _catalog_for_js():
+    """
+    The catalog as plain JSON types for the intake wizard's live pricing.
+    Decimal isn't JSON-serializable, so prices go over as floats -- they only
+    drive the on-screen preview; the saved value is always recomputed from the
+    Decimal prices server-side.
+    """
+    return {
+        key: {"label": entry["label"], "unit": entry["unit"], "price": float(entry["price"])}
+        for key, entry in catalog.CATALOG.items()
+    }
 
 
 def _format_gift_description(donation) -> str:
@@ -269,6 +283,7 @@ def donation_create(request):
             donation.site = site
             donation.cdonation_number = get_next_cdonation_number()
             donation.save()
+            form.save_items(donation)
             success = True
             cdonation_number = donation.cdonation_number
             if donation.email:
@@ -352,7 +367,18 @@ def donation_create(request):
     else:
         form = DonationForm(initial={"donation_date": date.today()})
 
-    return render(request, "donations/donation_form.html", {"form": form, "success": success, "site": site, "cdonation_number": cdonation_number})
+    return render(request, "donations/donation_form.html", {
+        "form": form,
+        "success": success,
+        "site": site,
+        "cdonation_number": cdonation_number,
+        "category_choices": catalog.CATEGORY_CHOICES,
+        "catalog_json": _catalog_for_js(),
+        "value_per_pound": settings.DONATION_VALUE_PER_POUND,
+        # Re-render whatever line items were posted, so a validation failure
+        # elsewhere on the form doesn't silently drop them.
+        "posted_items": getattr(form, "parsed_items", []),
+    })
 
 
 @login_required

@@ -185,6 +185,119 @@
   .wz-card { padding: 1.5rem 1.25rem 1.25rem; }
 }
 
+/* ── Donation lines ───────────────────────────────────── */
+.dl-list { margin-bottom: 1rem; }
+.dl-list:empty { display: none; }
+.dl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.dl-row-label {
+  flex: 1 1 auto;
+  font-size: 0.92rem;
+  color: var(--text);
+  font-weight: 600;
+}
+.dl-row-sub {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.dl-row-value {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dl-row-remove {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dl-row-remove:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.dl-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 12px 0;
+  border-top: 1.5px solid var(--line);
+  margin-top: 4px;
+  font-size: 0.86rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.dl-total strong {
+  font-size: 1rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Kind picker ──────────────────────────────────────── */
+.dl-kinds {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 0.9rem;
+}
+@media (max-width: 480px) {
+  .dl-kinds { grid-template-columns: 1fr 1fr; }
+}
+.dl-kind {
+  padding: 10px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+.dl-kind:hover:not(:disabled) { border-color: var(--primary); }
+.dl-kind.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.dl-kind:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dl-unit {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--primary);
+}
+.dl-calc {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary);
+  min-height: 1.1em;
+}
+.dl-add-btn { width: 100%; margin-top: 2px; }
+
 /* ── Step navigation bar ──────────────────────────────── */
 .wz-nav {
   display: flex;
@@ -515,38 +628,105 @@
         <div class="wz-form-errors">{{ form.non_field_errors }}</div>
         {% endif %}
 
-        <div class="wz-grid">
-          <div class="wz-field">
-            <label for="id_num_bags"># of Bags</label>
-            {{ form.num_bags.errors }}
-            {{ form.num_bags }}
+        <!-- What has been recorded so far. Rendered by JS from the form's
+             own inputs, so a server-side re-render restores it for free. -->
+        <div class="dl-list" id="dl-list"></div>
+
+        <!-- Add a line: kind first, then the entry that kind needs. -->
+        <div class="dl-add" id="dl-add">
+          <div class="dl-kinds" id="dl-kinds">
+            <button type="button" class="dl-kind" data-kind="goods">Goods</button>
+            <button type="button" class="dl-kind" data-kind="cash">Cash / Check</button>
+            <button type="button" class="dl-kind" data-kind="gift">Gift Cards</button>
+            <button type="button" class="dl-kind" data-kind="other">Other</button>
           </div>
-          <div class="wz-field">
-            <label for="id_num_boxes"># of Boxes</label>
-            {{ form.num_boxes.errors }}
-            {{ form.num_boxes }}
+
+          <div class="cond-group" id="cg-goods">
+            <div class="wz-field">
+              <label for="dl-category">Category</label>
+              <select id="dl-category" class="form-control">
+                <option value="general">General Food/Goods</option>
+                {% for key, label in category_choices %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- General Food/Goods: the donation's own columns, valued by weight -->
+            <div class="cond-group" id="cg-general">
+              <div class="wz-grid">
+                <div class="wz-field">
+                  <label for="id_num_bags"># of Bags</label>
+                  {{ form.num_bags.errors }}
+                  {{ form.num_bags }}
+                </div>
+                <div class="wz-field">
+                  <label for="id_num_boxes"># of Boxes</label>
+                  {{ form.num_boxes.errors }}
+                  {{ form.num_boxes }}
+                </div>
+              </div>
+              <div class="wz-field">
+                <label for="id_total_weight">Total Weight (lbs)</label>
+                {{ form.total_weight.errors }}
+                {{ form.total_weight }}
+              </div>
+            </div>
+
+            <!-- Priced catalog category: a quantity in that category's unit -->
+            <div class="cond-group" id="cg-qty">
+              <div class="wz-field">
+                <label for="dl-qty">Quantity <span id="dl-unit" class="dl-unit"></span></label>
+                <input type="number" step="0.01" min="0" id="dl-qty" class="form-control"
+                       autocomplete="off" inputmode="decimal" />
+                <div class="dl-calc" id="dl-calc"></div>
+              </div>
+            </div>
           </div>
-          <div class="wz-field">
-            <label for="id_cash_check">Cash / Check $</label>
-            {{ form.cash_check.errors }}
-            {{ form.cash_check }}
+
+          <div class="cond-group" id="cg-cash">
+            <div class="wz-field">
+              <label for="id_cash_check">Cash / Check $</label>
+              {{ form.cash_check.errors }}
+              {{ form.cash_check }}
+            </div>
           </div>
-          <div class="wz-field">
-            <label for="id_gift_cards">Gift Cards $</label>
-            {{ form.gift_cards.errors }}
-            {{ form.gift_cards }}
+
+          <div class="cond-group" id="cg-gift">
+            <div class="wz-field">
+              <label for="id_gift_cards">Gift Cards $</label>
+              {{ form.gift_cards.errors }}
+              {{ form.gift_cards }}
+            </div>
           </div>
-          <div class="wz-field">
-            <label for="id_other_donation">Other Donation</label>
-            {{ form.other_donation.errors }}
-            {{ form.other_donation }}
+
+          <div class="cond-group" id="cg-other">
+            <div class="wz-field">
+              <label for="id_other_donation">Other Donation</label>
+              {{ form.other_donation.errors }}
+              {{ form.other_donation }}
+            </div>
           </div>
-          <div class="wz-field">
-            <label for="id_total_weight">Total Weight (lbs)</label>
-            {{ form.total_weight.errors }}
-            {{ form.total_weight }}
+
+          <div class="cond-group" id="cg-addbtn">
+            <div class="wz-field-error" id="dl-err"></div>
+            <button type="button" class="wz-btn wz-btn-secondary dl-add-btn" id="dl-add-btn">
+              Add to donation
+            </button>
           </div>
         </div>
+
+        <!-- Submitted line items. Re-rendered from POST data so a validation
+             failure on another field doesn't discard what was added. -->
+        <div id="dl-hidden">
+          {% for category, quantity in posted_items %}
+          <input type="hidden" name="item_category" value="{{ category }}">
+          <input type="hidden" name="item_quantity" value="{{ quantity }}">
+          {% endfor %}
+        </div>
+
+        {{ catalog_json|json_script:"dl-catalog" }}
+        <span id="dl-rate" data-rate="{{ value_per_pound }}"></span>
 
         <div class="wz-field">
           <label for="id_notes">Notes</label>
@@ -880,6 +1060,299 @@
   }
 })();
 {% endif %}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   Donation lines — step 2
+
+   The list of what's been recorded is never stored in JS state. It is
+   rendered from the form's own inputs every time anything changes, so a
+   server-side re-render (a validation failure on any field) restores it
+   with no extra work and no way for the two to drift apart.
+
+   Where each kind lives:
+     General Food/Goods -> num_bags / num_boxes / total_weight  (Django fields)
+     Cash / Check       -> cash_check                            (Django field)
+     Gift Cards         -> gift_cards                            (Django field)
+     Other              -> other_donation                        (Django field)
+     Catalog categories -> item_category / item_quantity hidden input pairs
+   ══════════════════════════════════════════════════════════ */
+(() => {
+  const CATALOG  = JSON.parse(document.getElementById("dl-catalog").textContent);
+  const RATE     = Number(document.getElementById("dl-rate").dataset.rate);
+
+  const list     = document.getElementById("dl-list");
+  const hidden   = document.getElementById("dl-hidden");
+  const kindsBar = document.getElementById("dl-kinds");
+  const addBtn   = document.getElementById("dl-add-btn");
+  const errBox   = document.getElementById("dl-err");
+
+  const cgGoods   = document.getElementById("cg-goods");
+  const cgGeneral = document.getElementById("cg-general");
+  const cgQty     = document.getElementById("cg-qty");
+  const cgCash    = document.getElementById("cg-cash");
+  const cgGift    = document.getElementById("cg-gift");
+  const cgOther   = document.getElementById("cg-other");
+  const cgAddBtn  = document.getElementById("cg-addbtn");
+
+  const catSelect = document.getElementById("dl-category");
+  const qtyInput  = document.getElementById("dl-qty");
+  const unitLabel = document.getElementById("dl-unit");
+  const calcLabel = document.getElementById("dl-calc");
+
+  const fBags   = document.getElementById("id_num_bags");
+  const fBoxes  = document.getElementById("id_num_boxes");
+  const fWeight = document.getElementById("id_total_weight");
+  const fCash   = document.getElementById("id_cash_check");
+  const fGift   = document.getElementById("id_gift_cards");
+  const fOther  = document.getElementById("id_other_donation");
+
+  const money = (n) => "$" + n.toLocaleString("en-US", {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+  const num = (el) => {
+    const v = parseFloat((el.value || "").trim());
+    return isNaN(v) ? 0 : v;
+  };
+  const setOpen = (el, open) => el.classList.toggle("open", open);
+  const qtyText = (q) => (q === Math.floor(q) ? String(q) : q.toFixed(2));
+
+  /* ── Read the current lines out of the form ─────────── */
+  function readLines() {
+    const lines = [];
+
+    if (fBags.value.trim() || fBoxes.value.trim() || fWeight.value.trim()) {
+      const bits = [];
+      if (num(fBags))  bits.push(num(fBags) + (num(fBags) === 1 ? " bag" : " bags"));
+      if (num(fBoxes)) bits.push(num(fBoxes) + (num(fBoxes) === 1 ? " box" : " boxes"));
+      if (num(fWeight)) bits.push(qtyText(num(fWeight)) + " lbs");
+      lines.push({
+        kind: "general",
+        label: "General Food/Goods",
+        sub: bits.join(", ") || "no quantity recorded",
+        // Only weight carries a value; bags and boxes alone are unpriced.
+        value: num(fWeight) ? num(fWeight) * RATE : null,
+      });
+    }
+
+    const cats = hidden.querySelectorAll("input[name='item_category']");
+    const qtys = hidden.querySelectorAll("input[name='item_quantity']");
+    cats.forEach((catInput, i) => {
+      const key   = catInput.value;
+      const entry = CATALOG[key];
+      const q     = parseFloat(qtys[i] ? qtys[i].value : "0") || 0;
+      if (!entry) return;
+      lines.push({
+        kind: "item",
+        index: i,
+        label: entry.label,
+        sub: entry.unit === "pound"
+          ? qtyText(q) + " lbs at " + money(entry.price) + " per pound"
+          : qtyText(q) + " x " + money(entry.price) + " per " + entry.unit,
+        value: q * entry.price,
+      });
+    });
+
+    if (fCash.value.trim()) {
+      lines.push({ kind: "cash", label: "Cash / Check", sub: "money received",
+                   value: null, money: num(fCash) });
+    }
+    if (fGift.value.trim()) {
+      lines.push({ kind: "gift", label: "Gift Cards", sub: "money received",
+                   value: null, money: num(fGift) });
+    }
+    if (fOther.value.trim()) {
+      lines.push({ kind: "other", label: "Other", sub: fOther.value.trim(),
+                   value: null });
+    }
+    return lines;
+  }
+
+  /* ── Render ─────────────────────────────────────────── */
+  function render() {
+    const lines = readLines();
+    list.innerHTML = "";
+
+    let inKind = 0;
+    lines.forEach((line) => {
+      if (line.value) inKind += line.value;
+
+      const row = document.createElement("div");
+      row.className = "dl-row";
+
+      const label = document.createElement("div");
+      label.className = "dl-row-label";
+      label.textContent = line.label;
+      const sub = document.createElement("span");
+      sub.className = "dl-row-sub";
+      sub.textContent = line.sub;
+      label.appendChild(sub);
+
+      const value = document.createElement("div");
+      value.className = "dl-row-value";
+      if (line.value)           value.textContent = money(line.value);
+      else if (line.money)      value.textContent = money(line.money);
+      else                      value.textContent = "—";
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "dl-row-remove";
+      remove.textContent = "\u00d7";
+      remove.setAttribute("aria-label", "Remove " + line.label);
+      remove.addEventListener("click", () => removeLine(line));
+
+      row.append(label, value, remove);
+      list.appendChild(row);
+    });
+
+    if (lines.length) {
+      const total = document.createElement("div");
+      total.className = "dl-total";
+      total.innerHTML = "<span>Estimated in-kind value</span>";
+      const amount = document.createElement("strong");
+      amount.textContent = money(inKind);
+      total.appendChild(amount);
+      list.appendChild(total);
+    }
+
+    // Cash, gift cards, Other and General each have exactly one home on the
+    // donation, so they can only be added once.
+    const used = new Set(lines.map((l) => l.kind));
+    kindsBar.querySelectorAll(".dl-kind").forEach((btn) => {
+      const kind = btn.dataset.kind;
+      btn.disabled = (kind === "cash"  && used.has("cash"))
+                  || (kind === "gift"  && used.has("gift"))
+                  || (kind === "other" && used.has("other"));
+      if (btn.disabled) btn.classList.remove("selected");
+    });
+    if (catSelect.value === "general" && used.has("general")) {
+      catSelect.value = "general";
+    }
+  }
+
+  function removeLine(line) {
+    if (line.kind === "general") {
+      fBags.value = ""; fBoxes.value = ""; fWeight.value = "";
+    } else if (line.kind === "cash") {
+      fCash.value = "";
+    } else if (line.kind === "gift") {
+      fGift.value = "";
+    } else if (line.kind === "other") {
+      fOther.value = "";
+    } else if (line.kind === "item") {
+      const cats = hidden.querySelectorAll("input[name='item_category']");
+      const qtys = hidden.querySelectorAll("input[name='item_quantity']");
+      cats[line.index].remove();
+      if (qtys[line.index]) qtys[line.index].remove();
+    }
+    render();
+  }
+
+  /* ── Kind picker ────────────────────────────────────── */
+  let activeKind = null;
+
+  function selectKind(kind) {
+    activeKind = kind;
+    errBox.textContent = "";
+    kindsBar.querySelectorAll(".dl-kind").forEach((btn) => {
+      btn.classList.toggle("selected", btn.dataset.kind === kind);
+    });
+    setOpen(cgGoods, kind === "goods");
+    setOpen(cgCash,  kind === "cash");
+    setOpen(cgGift,  kind === "gift");
+    setOpen(cgOther, kind === "other");
+    setOpen(cgAddBtn, kind !== null);
+    if (kind === "goods") applyCategory();
+    else { setOpen(cgGeneral, false); setOpen(cgQty, false); }
+  }
+
+  function applyCategory() {
+    const key = catSelect.value;
+    const isGeneral = key === "general";
+    setOpen(cgGeneral, isGeneral);
+    setOpen(cgQty, !isGeneral);
+    if (!isGeneral) {
+      const entry = CATALOG[key];
+      unitLabel.textContent = entry ? "(" + entry.unit + ")" : "";
+      updateCalc();
+    }
+  }
+
+  function updateCalc() {
+    const entry = CATALOG[catSelect.value];
+    const q = parseFloat(qtyInput.value);
+    if (!entry || isNaN(q) || q <= 0) { calcLabel.textContent = ""; return; }
+    calcLabel.textContent = entry.unit === "pound"
+      ? qtyText(q) + " lbs x " + money(entry.price) + " = " + money(q * entry.price)
+      : qtyText(q) + " x " + money(entry.price) + " = " + money(q * entry.price);
+  }
+
+  kindsBar.addEventListener("click", (e) => {
+    const btn = e.target.closest(".dl-kind");
+    if (!btn || btn.disabled) return;
+    selectKind(btn.dataset.kind === activeKind ? null : btn.dataset.kind);
+  });
+  catSelect.addEventListener("change", () => { errBox.textContent = ""; applyCategory(); });
+  qtyInput.addEventListener("input", updateCalc);
+
+  /* ── Add ────────────────────────────────────────────── */
+  addBtn.addEventListener("click", () => {
+    errBox.textContent = "";
+
+    if (activeKind === "goods" && catSelect.value === "general") {
+      if (!fBags.value.trim() && !fBoxes.value.trim() && !fWeight.value.trim()) {
+        errBox.textContent = "Enter a number of bags, boxes or a total weight.";
+        return;
+      }
+    } else if (activeKind === "goods") {
+      const q = parseFloat(qtyInput.value);
+      if (isNaN(q) || q <= 0) {
+        errBox.textContent = "Enter a quantity greater than zero.";
+        return;
+      }
+      const cat = document.createElement("input");
+      cat.type = "hidden"; cat.name = "item_category"; cat.value = catSelect.value;
+      const qty = document.createElement("input");
+      qty.type = "hidden"; qty.name = "item_quantity"; qty.value = String(q);
+      hidden.append(cat, qty);
+      qtyInput.value = "";
+      calcLabel.textContent = "";
+    } else if (activeKind === "cash" || activeKind === "gift") {
+      const field = activeKind === "cash" ? fCash : fGift;
+      const v = parseFloat(field.value);
+      if (isNaN(v) || v <= 0) {
+        errBox.textContent = "Enter an amount greater than zero.";
+        return;
+      }
+    } else if (activeKind === "other") {
+      if (!fOther.value.trim()) {
+        errBox.textContent = "Describe what was donated.";
+        return;
+      }
+    } else {
+      return;
+    }
+
+    selectKind(null);
+    render();
+  });
+
+  /* ── Block submit with nothing recorded ─────────────── */
+  document.getElementById("wz-form").addEventListener("submit", (e) => {
+    if (readLines().length === 0) {
+      e.preventDefault();
+      errBox.textContent = "Add at least one thing donated before saving.";
+      if (!activeKind) selectKind("goods");
+    }
+  });
+
+  render();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    [cgGoods, cgGeneral, cgQty, cgCash, cgGift, cgOther, cgAddBtn]
+      .forEach((el) => el.classList.add("animated"));
+  }));
+})();
 </script>
 
 {% endblock %}
