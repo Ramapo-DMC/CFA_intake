@@ -126,6 +126,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# collectstatic gathers everything (including the admin's CSS) here for nginx
+# to serve; nothing serves static files in production otherwise.
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # ---------------------------------------------------------------------------
 # Brevo (Sendinblue) transactional email
