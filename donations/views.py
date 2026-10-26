@@ -304,7 +304,8 @@ def site_select(request):
             request.session["site_id"] = form.cleaned_data["site"].id
             return redirect("donation-create")
     else:
-        form = SiteSelectForm()
+        # Coming back via "Change site": start from the site already in use.
+        form = SiteSelectForm(initial={"site": request.session.get("site_id")})
     return render(request, "donations/site_select.html", {"form": form})
 
 @login_required
